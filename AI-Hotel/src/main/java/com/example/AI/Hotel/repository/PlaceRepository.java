@@ -12,27 +12,14 @@ import org.springframework.data.domain.Pageable;
 
 public interface PlaceRepository extends JpaRepository<Place, Integer> {
     Page<Place> findAll(Pageable pageable);
-//    // Tìm địa điểm theo tên (gần đúng)
-//    @Query("SELECT p FROM Place p WHERE LOWER(p.title) LIKE LOWER(CONCAT('%', :title, '%'))")
-//    Optional<Place> findByTitleIgnoreCase(@Param("title") String title);
-//
-//    // Tìm địa điểm theo nhiều tiêu chí
-//    @Query(value = "SELECT p.* FROM places p " +
-//            "WHERE (:title IS NULL OR LOWER(p.title) LIKE LOWER(CONCAT('%', :title, '%'))) " +
-//            "AND (:rating IS NULL OR LOWER(p.rating) LIKE LOWER(CONCAT('%', :rating, '%'))) " +
-//            "AND (:reviewCount IS NULL OR p.review_count = :reviewCount) " +
-//            "AND (:phoneNumber IS NULL OR LOWER(p.phone_number) LIKE LOWER(CONCAT('%', :phoneNumber, '%'))) " +
-//            "AND (:address IS NULL OR LOWER(p.address) LIKE LOWER(CONCAT('%', :address, '%'))) " +
-//            "AND (:latitude IS NULL OR :longitude IS NULL OR ST_DWithin(p.coordinates, ST_GeomFromText('POINT(:longitude :latitude)', 4326), :radius))",
-//            nativeQuery = true)
-//    List<Place> findByCriteria(
-//            @Param("title") String title,
-//            @Param("rating") String rating,
-//            @Param("reviewCount") String reviewCount,
-//            @Param("phoneNumber") String phoneNumber,
-//            @Param("address") String address,
-//            @Param("latitude") Double latitude,
-//            @Param("longitude") Double longitude,
-//            @Param("radius") Double radius
-//    );
+
+    @Query(value = "SELECT p.id, p.title, ST_Distance(h.coordinates, p.coordinates) AS distance " +
+            "FROM hotels h, places p " +
+            "WHERE h.id = :hotelId " +
+            "AND ST_DWithin(h.coordinates, p.coordinates, :maxDistance) " +
+            "ORDER BY distance " +
+            "LIMIT :limit", nativeQuery = true)
+    List<Object[]> findNearbyPlaces(@Param("hotelId") Integer hotelId,
+                                    @Param("maxDistance") double maxDistance,
+                                    @Param("limit") int limit);
 }

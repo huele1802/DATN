@@ -2,6 +2,7 @@ package com.example.AI.Hotel.controller;
 
 import com.example.AI.Hotel.dto.HotelSearchRequest;
 import com.example.AI.Hotel.dto.HotelSearchResponse;
+import com.example.AI.Hotel.dto.NearByPlaceDto;
 import com.example.AI.Hotel.service.HotelSearchService;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
@@ -25,10 +26,12 @@ import java.util.Map;
 public class HotelSearchController {
 
     private final HotelSearchService searchService;
+    private final HotelSearchService hotelSearchService;
 
     @Autowired
-    public HotelSearchController(HotelSearchService searchService) {
+    public HotelSearchController(HotelSearchService searchService, HotelSearchService hotelSearchService) {
         this.searchService = searchService;
+        this.hotelSearchService = hotelSearchService;
     }
 
     @PostMapping("/search")
@@ -74,6 +77,22 @@ public class HotelSearchController {
         }
     }
 
+    @GetMapping("/{hotelId}/nearby-places")
+    public ResponseEntity<List<NearByPlaceDto>> getNearbyPlaces(
+            @PathVariable Integer hotelId,
+            @RequestParam(required = false) Double maxDistance,
+            @RequestParam(required = false) Integer limit) {
+        List<NearByPlaceDto> nearbyPlaces = hotelSearchService.findNearbyPlaces(hotelId, maxDistance, limit);
+        return ResponseEntity.ok(nearbyPlaces);
+    }
+
+    @GetMapping("/search-by-price-and-guests")
+    public ResponseEntity<List<HotelSearchResponse>> searchHotelsByPriceAndGuests(
+            @RequestParam Double maxPrice,
+            @RequestParam Integer numberOfGuests) {
+        List<HotelSearchResponse> results = hotelSearchService.searchHotelsByPriceAndGuests(maxPrice, numberOfGuests);
+        return ResponseEntity.ok(results);
+    }
     // Xử lý lỗi validation
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, String>> handleValidationExceptions(MethodArgumentNotValidException ex) {

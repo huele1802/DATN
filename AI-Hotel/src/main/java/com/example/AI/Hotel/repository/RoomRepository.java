@@ -13,21 +13,11 @@ public interface RoomRepository extends JpaRepository<RoomType, Integer> {
     Page<RoomType> findAll(Pageable pageable); // phaan trang
     List<RoomType> findByHotelIdIn(List<Integer> hotelIds);
 
+    // truy vấn phòng theo giá và so luong khách
+    @Query("SELECT rt FROM RoomType rt WHERE rt.price <= :maxPrice AND rt.numberOfGuests >= :numberOfGuests")
+    List<RoomType> findByPriceAndGuests(
+            @Param("maxPrice") Double maxPrice,
+            @Param("numberOfGuests") Integer numberOfGuests);
 
 
-//    // Tìm phòng theo loại phòng (dựa trên name), số lượng khách, giá, và hotel_id
-//    @Query("SELECT r FROM RoomType r WHERE " +
-//            "(:roomType IS NULL OR LOWER(r.name) LIKE LOWER(CONCAT('%', :roomType, '%'))) " +
-//            "AND (:numberOfGuests IS NULL OR r.numberOfGuests >= :numberOfGuests) " +
-//            "AND (:maxPrice IS NULL OR r.price <= :maxPrice) " +
-//            "AND r.hotel.id = :hotelId")
-//    List<RoomType> findByCriteriaAndHotelId(
-//            @Param("roomType") String roomType,
-//            @Param("numberOfGuests") Integer numberOfGuests,
-//            @Param("maxPrice") Integer maxPrice,
-//            @Param("hotelId") Integer hotelId
-//    );
-//
-//    // Tìm phòng theo hotel_id
-//    List<RoomType> findByHotelId(Integer hotelId);
 }
