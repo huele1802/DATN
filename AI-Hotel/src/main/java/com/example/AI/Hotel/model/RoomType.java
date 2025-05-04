@@ -20,10 +20,18 @@ public class RoomType {
     @JoinColumn(name = "hotel_id", nullable = false)
     private Hotel hotel;
 
+    @Column(name = "name", columnDefinition = "TEXT")
     private String name;
 
     @Column(name = "number_of_guests")
     private Integer numberOfGuests;
 
+    @Column(name = "price")
     private Integer price;
+
+    @Column(name = "original_price")
+    private Integer originalPrice;
+
+    @Column(name = "taxes_and_fees_under_price")
+    private Boolean taxesAndFeesUnderPrice;
 }

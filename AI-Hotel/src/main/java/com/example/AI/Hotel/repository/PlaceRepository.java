@@ -13,6 +13,19 @@ import org.springframework.data.domain.Pageable;
 public interface PlaceRepository extends JpaRepository<Place, Integer> {
     Page<Place> findAll(Pageable pageable);
 
+    @Query(value = "SELECT p.id, p.title, p.rating, p.address, p.review, p.slug, " +
+            "ST_AsText(p.coordinates) AS coordinates_text, p.image_url, p.description, p.service, " +
+            "ST_Distance(h.coordinates, p.coordinates) AS distance_in_meters " +
+            "FROM hotels h, places p " +
+            "WHERE h.id = :hotelId " +
+            "AND ST_DWithin(h.coordinates, p.coordinates, :maxDistance) " +
+            "ORDER BY distance_in_meters " +
+            "LIMIT :limit", nativeQuery = true)
+    List<Object[]> findNearbyPlaces(
+            @Param("hotelId") Integer hotelId,
+            @Param("maxDistance") double maxDistance,
+            @Param("limit") int limit);
+    /*
     @Query(value = "SELECT p.id, p.title, ST_Distance(h.coordinates, p.coordinates) AS distance " +
             "FROM hotels h, places p " +
             "WHERE h.id = :hotelId " +
@@ -22,4 +35,5 @@ public interface PlaceRepository extends JpaRepository<Place, Integer> {
     List<Object[]> findNearbyPlaces(@Param("hotelId") Integer hotelId,
                                     @Param("maxDistance") double maxDistance,
                                     @Param("limit") int limit);
+     */
 }

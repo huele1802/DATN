@@ -10,8 +10,16 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 public interface RoomRepository extends JpaRepository<RoomType, Integer> {
-    Page<RoomType> findAll(Pageable pageable); // phaan trang
+    Page<RoomType> findAll(Pageable pageable); // phân trang
     List<RoomType> findByHotelIdIn(List<Integer> hotelIds);
+
+    //  tìm phòng chỉ theo giá
+    @Query("SELECT r FROM RoomType r WHERE r.price <= :maxPrice")
+    List<RoomType> findByPrice(@Param("maxPrice") Double maxPrice);
+
+    // tìm phòng chỉ theo số khách
+    @Query("SELECT r FROM RoomType r WHERE r.numberOfGuests >= :numberOfGuests")
+    List<RoomType> findByGuests(@Param("numberOfGuests") Integer numberOfGuests);
 
     // truy vấn phòng theo giá và so luong khách
     @Query("SELECT rt FROM RoomType rt WHERE rt.price <= :maxPrice AND rt.numberOfGuests >= :numberOfGuests")
@@ -19,5 +27,7 @@ public interface RoomRepository extends JpaRepository<RoomType, Integer> {
             @Param("maxPrice") Double maxPrice,
             @Param("numberOfGuests") Integer numberOfGuests);
 
+    @Query("SELECT rt FROM RoomType rt WHERE rt.hotel.id = :hotelId")
+    List<RoomType> findByHotelId(@Param("hotelId") Integer hotelId);
 
 }

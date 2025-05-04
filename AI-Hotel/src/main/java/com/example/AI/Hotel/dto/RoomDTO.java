@@ -7,10 +7,12 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class RoomTypeDTO {
-    private Integer roomId;
+public class RoomDTO {
+    private Integer id;
+    private Integer hotelId;
     private String name;
     private Integer numberOfGuests;
     private Integer price;
-    private double roomSimilarityScore;
+    private Integer originalPrice;
+    private Boolean taxesAndFeesUnderPrice;
 }

@@ -54,18 +54,35 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-validation</artifactId>
 		</dependency>
+<!--		<dependency>-->
+<!--			<groupId>io.hypersistence</groupId>-->
+<!--			<artifactId>hypersistence-utils-hibernate-63</artifactId>-->
+<!--			<version>3.9.9</version>-->
+<!--		</dependency>-->
+		<!-- https://mvnrepository.com/artifact/io.hypersistence/hypersistence-utils-hibernate-63 -->
 		<dependency>
 			<groupId>io.hypersistence</groupId>
 			<artifactId>hypersistence-utils-hibernate-63</artifactId>
-			<version>3.9.9</version>
+			<version>3.9.0</version>
 		</dependency>
 
-			<dependency>
-				<groupId>org.hibernate.orm</groupId>
-				<artifactId>hibernate-core</artifactId>
-				<version>6.6.11.Final</version>
-			</dependency>
+		<dependency>
+			<groupId>org.hibernate.orm</groupId>
+			<artifactId>hibernate-core</artifactId>
+			<version>6.6.11.Final</version>
+		</dependency>
 
+<!--		<dependency>-->
+<!--			<groupId>org.hibernate.orm</groupId>-->
+<!--			<artifactId>hibernate-vector</artifactId>-->
+<!--			<version>6.2.5.Final</version> &lt;!&ndash; Khớp với Hibernate 6.2.5 của Spring Boot 3.4.4 &ndash;&gt;-->
+<!--		</dependency>-->
+
+<!--		<dependency>-->
+<!--			<groupId>com.pgvector</groupId>-->
+<!--			<artifactId>pgvector</artifactId>-->
+<!--			<version>0.1.6</version>-->
+<!--		</dependency>-->
 
 		<!-- DJL (Deep Java Library) for embedding generation -->
 		<dependency>
@@ -109,7 +126,7 @@
 		<dependency>
 			<groupId>org.postgresql</groupId>
 			<artifactId>postgresql</artifactId>
-			<scope>runtime</scope>
+<!--			<scope>runtime</scope>-->
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -117,6 +134,7 @@
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
+
 	<dependencyManagement>
 		<dependencies>
 			<dependency>

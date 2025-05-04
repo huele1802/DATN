@@ -11,19 +11,21 @@ import java.util.Map;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class PlaceDTO {
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public class HotelDTO {
     private Integer id;
-    private String title;
-    private Float rating;
+    private String name;
     private String address;
-    private Integer review;
+    private String district;
+    private String description;
+    private String hotelLink;
+    private Integer ratingStars;
+    private List<String> facilities;
+    private Map<String, List<String>> highlights;
+    private Map<String, Double> reviews;
+    private List<String> imageUrls;
+    private Map<String, List<String>> roomServices;
     private String slug;
     private Double latitude; // Vĩ độ
     private Double longitude; // Kinh độ
-    private String imageUrl;
-    private String description;
-    private List<Map<String, List<String>>> services;
-
-    @JsonInclude(JsonInclude.Include.NON_NULL) // xử lý cho api trả về dữ liệu place
-    private Double distanceInMeters;
 }

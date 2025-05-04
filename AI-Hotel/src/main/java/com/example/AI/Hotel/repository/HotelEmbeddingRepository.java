@@ -11,9 +11,12 @@ import java.util.Optional;
 
 @Repository
 public interface HotelEmbeddingRepository extends JpaRepository<HotelEmbedding, Integer> {
-
-
     long count();
+
+
+    @Query("SELECT he FROM HotelEmbedding he JOIN FETCH he.hotel")
+    List<HotelEmbedding> findAllWithHotelId();
+
 
     @Query(value = "SELECT he.hotel_id, he.text_embedding <=> CAST(:queryEmbedding AS vector) AS distance " +
             "FROM hotel_embeddings_backup he " +

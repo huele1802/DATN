@@ -2,18 +2,20 @@ package com.example.AI.Hotel.controller;
 
 import com.example.AI.Hotel.dto.HotelSearchResponse;
 import com.example.AI.Hotel.dto.PlaceDTO;
-import com.example.AI.Hotel.dto.RoomTypeDTO;
+import com.example.AI.Hotel.dto.RoomDTO;
 import com.example.AI.Hotel.service.HotelDataService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
+@Slf4j
 @RestController
-@RequestMapping("/api/getAll")
+@RequestMapping("/getAll")
 public class HotelDataController {
 
     private final HotelDataService hotelDataService;
@@ -24,20 +26,111 @@ public class HotelDataController {
     }
 
     @GetMapping("/hotels")
-    public ResponseEntity<List<HotelSearchResponse>> getAllHotels() {
-        List<HotelSearchResponse> hotels = hotelDataService.getAllHotels();
-        return ResponseEntity.ok(hotels);
+    public ResponseEntity<Map<String, Object>> getAllHotels(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        try {
+            // Không cần trừ 1 từ page, vì Spring Data đã xử lý one-based index
+            Page<HotelSearchResponse> hotelsPage = hotelDataService.getAllHotels(page, size);
+            return buildPagedResponse(hotelsPage, "Không tìm thấy khách sạn");
+        } catch (Exception e) {
+            log.error("Error fetching all hotels: page={}, size={}", page, size, e);
+            return buildErrorResponse(e);
+        }
+    }
+
+    @GetMapping("/hotels/{id}")
+    public ResponseEntity<Map<String, Object>> getHotelById(@PathVariable Integer id) {
+        try {
+            HotelSearchResponse hotel = hotelDataService.getHotelById(id);
+            return buildDetailResponse(hotel, "hotel", "Không tìm thấy khách sạn với id: " + id);
+        } catch (Exception e) {
+            log.error("Error fetching hotel with id: {}", id, e);
+            return buildErrorResponse(e);
+        }
     }
 
     @GetMapping("/rooms")
-    public ResponseEntity<List<RoomTypeDTO>> getAllRooms() {
-        List<RoomTypeDTO> rooms = hotelDataService.getAllRooms();
-        return ResponseEntity.ok(rooms);
+    public ResponseEntity<Map<String, Object>> getAllRooms(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        try {
+            // Không cần trừ 1 từ page, vì Spring Data đã xử lý one-based index
+            Page<RoomDTO> roomsPage = hotelDataService.getAllRooms(page, size);
+            return buildPagedResponse(roomsPage, "Không tìm thấy phòng");
+        } catch (Exception e) {
+            log.error("Error fetching all rooms: page={}, size={}", page, size, e);
+            return buildErrorResponse(e);
+        }
+    }
+
+    @GetMapping("/rooms/{id}")
+    public ResponseEntity<Map<String, Object>> getRoomById(@PathVariable Integer id) {
+        try {
+            RoomDTO room = hotelDataService.getRoomById(id);
+            return buildDetailResponse(room, "room", "Không tìm thấy phòng với id: " + id);
+        } catch (Exception e) {
+            log.error("Error fetching room with id: {}", id, e);
+            return buildErrorResponse(e);
+        }
     }
 
     @GetMapping("/places")
-    public ResponseEntity<List<PlaceDTO>> getAllPlaces() {
-        List<PlaceDTO> places = hotelDataService.getAllPlaces();
-        return ResponseEntity.ok(places);
+    public ResponseEntity<Map<String, Object>> getAllPlaces(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        try {
+            // Không cần trừ 1 từ page, vì Spring Data đã xử lý one-based index
+            Page<PlaceDTO> placesPage = hotelDataService.getAllPlaces(page, size);
+            return buildPagedResponse(placesPage, "Không tìm thấy địa điểm");
+        } catch (Exception e) {
+            log.error("Error fetching all places: page={}, size={}", page, size, e);
+            return buildErrorResponse(e);
+        }
+    }
+
+    @GetMapping("/places/{id}")
+    public ResponseEntity<Map<String, Object>> getPlaceById(@PathVariable Integer id) {
+        try {
+            PlaceDTO place = hotelDataService.getPlaceById(id);
+            return buildDetailResponse(place, "place", "Không tìm thấy địa điểm với id: " + id);
+        } catch (Exception e) {
+            log.error("Error fetching place with id: {}", id, e);
+            return buildErrorResponse(e);
+        }
+    }
+
+    // Method dùng chung để build response phân trang
+    private <T> ResponseEntity<Map<String, Object>> buildPagedResponse(Page<T> pageData, String notFoundMessage) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("data", pageData.getContent());
+        response.put("currentPage", pageData.getNumber() + 1); // Chuyển về one-based index (bắt đầu từ 1)
+        response.put("totalItems", pageData.getTotalElements());
+        response.put("totalPages", pageData.getTotalPages());
+
+        if (pageData.getContent().isEmpty()) {
+            response.put("message", notFoundMessage);
+            return ResponseEntity.status(404).body(response);
+        }
+
+        return ResponseEntity.ok(response);
+    }
+
+    // Method dùng chung để build response chi tiết
+    private <T> ResponseEntity<Map<String, Object>> buildDetailResponse(T data, String key, String notFoundMessage) {
+        Map<String, Object> response = new HashMap<>();
+        if (data == null) {
+            response.put("message", notFoundMessage);
+            return ResponseEntity.status(404).body(response);
+        }
+        response.put(key, data);
+        return ResponseEntity.ok(response);
+    }
+
+    // Method dùng chung để build response lỗi
+    private ResponseEntity<Map<String, Object>> buildErrorResponse(Exception e) {
+        Map<String, Object> errorResponse = new HashMap<>();
+        errorResponse.put("error", "Lỗi máy chủ: " + e.getMessage());
+        return ResponseEntity.status(500).body(errorResponse);
     }
 }

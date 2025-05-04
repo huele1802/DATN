@@ -13,33 +13,36 @@ import org.springframework.data.domain.Pageable;
 @Repository
 public interface HotelRepository extends JpaRepository<Hotel, Integer> {
     Page<Hotel> findAll(Pageable pageable);
-//    @Query(value = """
-//        SELECT *
-//        FROM hotels h
-//        WHERE (:facilityValue IS NULL OR h.facilities @> ARRAY[:facilityValue]::jsonb)
-//        AND (:highlightValue IS NULL OR EXISTS (
-//            SELECT 1
-//            FROM jsonb_each_text(h.highlights) hl
-//            WHERE hl.value ILIKE '%' || :highlightValue || '%'
-//        ))
-//        AND (:minRatingStars IS NULL OR h.rating_stars >= :minRatingStars)
-//        AND (
-//            :latitude IS NULL
-//            OR :longitude IS NULL
-//            OR ST_DWithin(
-//                ST_GeomFromText(h.coordinates),
-//                ST_MakePoint(:longitude, :latitude),
-//                :radius
-//            )
-//        )
-//        """, nativeQuery = true)
-//    List<Hotel> findHotelsByCriteria(
-//            @Param("facilityValue") String facilityValue,
-//            @Param("highlightValue") String highlightValue,
-//            @Param("minRatingStars") Integer minRatingStars,
-//            @Param("latitude") Double latitude,
-//            @Param("longitude") Double longitude,
-//            @Param("radius") Double radius
-//
-//    );
+
+    // Tìm khách sạn theo danh sách ID và district
+    @Query("SELECT h FROM Hotel h WHERE h.id IN :ids AND h.district = :district")
+    List<Hotel> findAllByIdAndDistrict(@Param("ids") Iterable<Integer> ids, @Param("district") String district);
+
+    @Query(value = "SELECT h.id, h.embedding, 1 - (h.embedding <=> CAST(:embedding AS vector)) AS similarity " +
+            "FROM hotels h " +
+            "WHERE (1 - (h.embedding <=> CAST(:embedding AS vector))) > :threshold " +
+            "ORDER BY similarity DESC " +
+            "LIMIT :limit", nativeQuery = true)
+    List<Object[]> findTopSimilarHotelsForSearchV2(
+            @Param("embedding") String embedding,
+            @Param("threshold") double threshold,
+            @Param("limit") int limit);
+
+    @Query(value = """
+        SELECT 
+            he.hotel_id,
+            h.name AS hotel_name,
+            (1 - (he.embedding <=> CAST(:queryEmbedding AS vector))) AS similarity
+        FROM hotel_embeddings he
+        JOIN hotels h ON he.hotel_id = h.id
+        WHERE (1 - (he.embedding <=> CAST(:queryEmbedding AS vector))) >= :threshold
+        ORDER BY similarity DESC
+        LIMIT :limit
+        """, nativeQuery = true)
+    List<Object[]> findTopSimilarHotels(
+            @Param("queryEmbedding") String queryEmbedding,
+            @Param("threshold") double threshold,
+            @Param("limit") int limit
+    );
+
 }

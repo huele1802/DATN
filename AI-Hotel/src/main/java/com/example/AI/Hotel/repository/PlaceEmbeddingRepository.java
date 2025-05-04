@@ -13,8 +13,9 @@ public interface PlaceEmbeddingRepository extends JpaRepository<PlaceEmbedding, 
 
     long count();
 
-    @Query("SELECT pe.placeId FROM PlaceEmbedding pe")
-    List<Long> findAllPlaceIds();
+
+    @Query("SELECT pe FROM PlaceEmbedding pe JOIN FETCH pe.place")
+    List<PlaceEmbedding> findAllWithPlaceId();
 
     @Query(value = "SELECT * FROM place_embeddings ORDER BY text_embedding <-> CAST(:embedding AS vector) LIMIT :limit", nativeQuery = true)
     List<PlaceEmbedding> findNearestPlaces(@Param("embedding") String embedding, @Param("limit") int limit);

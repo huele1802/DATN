@@ -1,10 +1,7 @@
 package com.example.AI.Hotel;
 
-import com.example.AI.Hotel.repository.HotelEmbeddingRepository;
-import com.example.AI.Hotel.repository.PlaceEmbeddingRepository;
-import com.example.AI.Hotel.repository.RoomEmbeddingRepository;
 import com.example.AI.Hotel.service.EmbeddingService;
-import lombok.RequiredArgsConstructor;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
@@ -13,44 +10,29 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 
 @SpringBootApplication
-@RequiredArgsConstructor
 public class AiHotelApplication {
 
-	private final EmbeddingService embeddingService;
-	private static final Logger log = LoggerFactory.getLogger(AiHotelApplication.class);
+	private static final Logger logger = LoggerFactory.getLogger(AiHotelApplication.class);
 
 	public static void main(String[] args) {
 		SpringApplication.run(AiHotelApplication.class, args);
+		logger.info("AI Hotel Application started successfully!");
+	}
+	@Bean
+	public ObjectMapper objectMapper() {
+		return new ObjectMapper();
 	}
 
 	@Bean
 	public CommandLineRunner init(EmbeddingService embeddingService) {
 		return args -> {
-			boolean forcePrecompute = false;
-			// Kiểm tra tham số khởi động
-			for (String arg : args) {
-				if (arg.equals("--precompute=true")) {
-					forcePrecompute = true;
-					break;
-				}
-			}
-
+			// Kiểm tra và xác thực các embedding khi ứng dụng khởi động
+			logger.info("Validating hotel and place embeddings...");
 			try {
-				// Gọi phương thức từ EmbeddingService để kiểm tra và precompute
-				boolean dataExists = embeddingService.checkSourceDataExists();
-				log.info("Source data exists? {}", dataExists);
-
-				if (forcePrecompute || dataExists) {
-					log.info("Starting precompute embeddings... (forcePrecompute: {}, dataExists: {})",
-							forcePrecompute, dataExists);
-					embeddingService.precomputeEmbeddings(forcePrecompute);
-					log.info("Successfully precomputed embeddings for hotels, rooms, and places.");
-				} else {
-					log.info("No source data found in hotels, room_types, or places, skipping precompute.");
-				}
+				embeddingService.validateEmbeddings();
+				logger.info("Embedding validation completed successfully.");
 			} catch (Exception e) {
-				log.error("Error during precompute embeddings: {}", e.getMessage(), e);
-				throw new RuntimeException("Failed to precompute embeddings", e);
+				logger.error("Error during embedding validation: {}", e.getMessage(), e);
 			}
 		};
 	}
