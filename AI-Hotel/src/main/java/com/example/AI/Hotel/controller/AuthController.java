@@ -37,26 +37,6 @@ public class AuthController {
     @Autowired
     private AuthenticationManager authenticationManager;
 
-    /*
-    @PostMapping("/register")
-    public ResponseEntity<String> register(@Valid @RequestBody RegisterRequest request) {
-        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
-            return ResponseEntity.badRequest().body("Email already exists");
-        }
-
-        User user = new User();
-        user.setEmail(request.getEmail());
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setFullName(request.getFullName());
-        user.setPhoneNumber(request.getPhoneNumber());
-        user.setDateOfBirth(request.getDateOfBirth());
-        user.setAddress(request.getAddress());
-        user.setRole(User.Role.USER);
-        userRepository.save(user);
-
-        return ResponseEntity.ok("User registered successfully");
-    }
-    */
 
 // trả về key-value: message
     @PostMapping("/register")
