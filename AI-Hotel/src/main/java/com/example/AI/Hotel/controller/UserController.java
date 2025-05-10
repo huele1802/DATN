@@ -47,8 +47,9 @@ public class UserController {
         return ResponseEntity.ok(historyDTOs);
     }
 
-    @PutMapping("/profile")
-    public ResponseEntity<Map<String, Object>> updateProfile(@Valid @RequestBody UpdateProfileRequest request) {
+    @PutMapping(value = "/profile", consumes = "multipart/form-data")
+    public ResponseEntity<Map<String, Object>> updateProfile(@Valid @RequestPart("request") UpdateProfileRequest request,
+                                                             @RequestPart(value = "avatar", required = false) MultipartFile avatar) {
         Map<String, Object> response = new HashMap<>();
 
         try {

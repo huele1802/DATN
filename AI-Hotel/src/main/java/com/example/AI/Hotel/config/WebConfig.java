@@ -16,12 +16,4 @@ public class WebConfig implements WebMvcConfigurer{
         return new MappingJackson2HttpMessageConverter(objectMapper);
     }
 
-    @Override
-    public void addCorsMappings(CorsRegistry registry) {
-        registry.addMapping("/**") // Áp dụng cho tất cả endpoints
-                .allowedOrigins("http://localhost:5173") // Thay bằng frontend domain
-                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-                .allowedHeaders("*")
-                .allowCredentials(true); // Nếu cần gửi cookie, token
-    }
 }
