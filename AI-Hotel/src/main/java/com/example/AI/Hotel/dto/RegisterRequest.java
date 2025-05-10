@@ -27,11 +27,10 @@ public class RegisterRequest {
     @Size(min = 10, max = 15, message = "INVALID_PHONE_FORMAT: Phone number must be between 10 and 15 characters")
     private String phoneNumber;
 
-    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd") // Định dạng mặc định
+    @JsonFormat(pattern = "dd-MM-yyyy")
     private LocalDate dateOfBirth;
 
     @Size(max = 255, message = "INVALID_ADDRESS_FORMAT: Address must not exceed 255 characters")
     private String address;
-
 
 }
