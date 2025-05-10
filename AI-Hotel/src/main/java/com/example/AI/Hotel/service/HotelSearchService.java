@@ -13,6 +13,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.*;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
@@ -27,13 +29,17 @@ public class HotelSearchService {
     private static final Logger logger = LoggerFactory.getLogger(HotelSearchService.class);
 
     private static final double SIMILARITY_THRESHOLD = 0.68;
+    private static final double ROOM_SIMILARITY_THRESHOLD = 0.4;
     private static final int MAX_HOTELS = 50;
+    private static final int MAX_ROOMS = 200;
     private static final String EMBEDDING_API_URL = "http://localhost:8000/embed";
     private static final double DEFAULT_MAX_DISTANCE_METERS = 5000; // Bán kính mặc định 5km
 
     private final HotelRepository hotelRepository;
     private final RoomRepository roomRepository;
     private final PlaceRepository placeRepository;
+    private final SearchHistoryRepository searchHistoryRepository; // Thêm repository để lưu lịch sử
+    private final UserRepository userRepository;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
 
@@ -44,16 +50,20 @@ public class HotelSearchService {
             PlaceRepository placeRepository,
             HotelEmbeddingRepository hotelEmbeddingRepository,
             PlaceEmbeddingRepository placeEmbeddingRepository,
+            SearchHistoryRepository searchHistoryRepository,
+            UserRepository userRepository,
             ObjectMapper objectMapper
     ) {
         this.hotelRepository = hotelRepository;
         this.roomRepository = roomRepository;
         this.placeRepository = placeRepository;
+        this.searchHistoryRepository = searchHistoryRepository;
+        this.userRepository = userRepository;
         this.restTemplate = new RestTemplate();
         this.objectMapper = objectMapper != null ? objectMapper : new ObjectMapper();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<HotelSearchResponse> searchHotels(@Valid HotelSearchRequest request) {
         logger.info("Processing search query: {}", request.getQuery());
 
@@ -62,12 +72,25 @@ public class HotelSearchService {
             float[] queryEmbedding = getQueryEmbedding(request.getQuery());
             logger.debug("Query embedding created, length: {}", queryEmbedding.length);
 
-            // Tìm các khách sạn phù hợp
+            // Tìm các khách sạn và phòng phù hợp
             List<HotelSearchResponse> results = findMatchingHotels(queryEmbedding);
 
-            // Sắp xếp theo độ tương đồng
+            // Sắp xếp theo độ tương đồng của khách sạn
             results.sort(Comparator.comparingDouble(HotelSearchResponse::getSimilarityScore).reversed());
-            logger.info("Found {} matching hotels", results.size());
+            logger.info("Found {} matching hotels after room filtering", results.size());
+
+            // Lưu lịch sử tìm kiếm chỉ khi user đã đăng nhập
+            String email = SecurityContextHolder.getContext().getAuthentication() != null
+                    ? SecurityContextHolder.getContext().getAuthentication().getName()
+                    : null;
+            if (email != null && !email.trim().isEmpty() && !email.equals("anonymousUser")) {
+                User user = userRepository.findByEmail(email)
+                        .orElseThrow(() -> new IllegalStateException("User not found with email: " + email));
+                saveSearchHistory(request.getQuery(), user);
+            } else {
+                logger.warn("Skipping search history save: No authenticated user or anonymous user detected");
+            }
+
             return results;
 
         } catch (Exception e) {
@@ -76,35 +99,12 @@ public class HotelSearchService {
         }
     }
 
-    @Transactional(readOnly = true)
-    public List<HotelSearchResponse> searchHotelsV2(@Valid HotelSearchRequest request) {
-        logger.info("Processing search query (v2): {}", request.getQuery());
-
-        try {
-            // Gọi API Python để tạo embedding
-            float[] queryEmbedding = getQueryEmbedding(request.getQuery());
-            logger.debug("Query embedding created, length: {}", queryEmbedding.length);
-
-            // Tìm các khách sạn phù hợp
-            List<HotelSearchResponse> results = findMatchingHotelsV2(queryEmbedding);
-
-            // Sắp xếp theo độ tương đồng
-            results.sort(Comparator.comparingDouble(HotelSearchResponse::getSimilarityScore).reversed());
-            logger.info("Found {} matching hotels (v2)", results.size());
-            return results;
-
-        } catch (Exception e) {
-            logger.error("Error processing search query (v2): {}", request.getQuery(), e);
-            throw new RuntimeException("Failed to process search query (v2)", e);
-        }
-    }
-
     private List<HotelSearchResponse> findMatchingHotels(float[] queryEmbedding) {
         List<HotelSearchResponse> responses = new ArrayList<>();
 
-        String queryEmbeddingStr = arrayToString(queryEmbedding);
-//        double maxDistance = 1 - SIMILARITY_THRESHOLD;
+        String queryEmbeddingStr = arrayToString(queryEmbedding); // chuyển query dạng float[] sang String
 
+        // Bước 1: Tìm các khách sạn phù hợp dựa trên hotel_embeddings
         List<Object[]> similarHotels = hotelRepository.findTopSimilarHotels(
                 queryEmbeddingStr, SIMILARITY_THRESHOLD, MAX_HOTELS);
         logger.info("Hotels above threshold ({}): {}", SIMILARITY_THRESHOLD, similarHotels.size());
@@ -122,15 +122,52 @@ public class HotelSearchService {
 
         List<Integer> hotelIds = similarHotels.stream()
                 .map(result -> (Integer) result[0])
+                .toList();
+
+        // Bước 2: Tìm các phòng phù hợp dựa trên room_embeddings
+        List<Object[]> similarRooms = roomRepository.findTopSimilarRooms(
+                queryEmbeddingStr, ROOM_SIMILARITY_THRESHOLD, MAX_ROOMS);
+        logger.info("Rooms above threshold ({}): {}", ROOM_SIMILARITY_THRESHOLD, similarRooms.size());
+
+        if (similarRooms.isEmpty()) {
+            logger.warn("No rooms found above similarity threshold {}. Checking all rooms for debug...", ROOM_SIMILARITY_THRESHOLD);
+            List<Object[]> allRooms = roomRepository.findTopSimilarRooms(queryEmbeddingStr, 0.0, 10);
+            for (Object[] result : allRooms) {
+                Integer roomId = (Integer) result[0];
+                double similarity = (Double) result[2];
+                logger.debug("Debug - Room ID: {}, Similarity: {}", roomId, similarity);
+            }
+            return responses; // Không có phòng phù hợp, trả về danh sách rỗng
+        }
+
+        // Lấy danh sách ID phòng và khách sạn tương ứng
+        List<Integer> roomIds = similarRooms.stream()
+                .map(result -> (Integer) result[0])
                 .collect(Collectors.toList());
 
-        List<RoomType> relevantRoomTypes = roomRepository.findByHotelIdIn(hotelIds);
+        List<Integer> roomHotelIds = roomRepository.findHotelIdsByRoomIds(roomIds);
+        List<Integer> filteredHotelIds = hotelIds.stream()
+                .filter(hotelId -> roomHotelIds.contains(hotelId))
+                .collect(Collectors.toList());
 
-        List<Hotel> hotels = hotelRepository.findAllById(hotelIds);
-        for (Object[] result : similarHotels) {
-            Integer hotelId = (Integer) result[0];
-            double similarity = (Double) result[2];
-            logger.debug("Processing Hotel ID: {}, Similarity: {}", hotelId, similarity);
+        if (filteredHotelIds.isEmpty()) {
+            logger.info("No hotels have rooms matching the room similarity threshold.");
+            return responses;
+        }
+
+        // Lấy thông tin khách sạn và phòng
+        List<Hotel> hotels = hotelRepository.findAllById(filteredHotelIds);
+        List<RoomType> relevantRoomTypes = roomRepository.findByIdIn(roomIds);
+
+        // Bước 3: Xây dựng kết quả
+        for (Object[] hotelResult : similarHotels) {
+            Integer hotelId = (Integer) hotelResult[0];
+            if (!filteredHotelIds.contains(hotelId)) {
+                continue; // Bỏ qua khách sạn không có phòng phù hợp
+            }
+
+            double hotelSimilarity = (Double) hotelResult[2];
+            logger.debug("Processing Hotel ID: {}, Similarity: {}", hotelId, hotelSimilarity);
 
             Optional<Hotel> hotelOpt = hotels.stream().filter(h -> h.getId().equals(hotelId)).findFirst();
             if (hotelOpt.isEmpty()) {
@@ -139,21 +176,77 @@ public class HotelSearchService {
             }
             Hotel hotel = hotelOpt.get();
 
+            // Lấy các phòng phù hợp với khách sạn này
+            List<RoomType> hotelRooms = relevantRoomTypes.stream()
+                    .filter(rt -> rt.getHotel().getId().equals(hotelId))
+                    .toList();
+
+            if (hotelRooms.isEmpty()) {
+                logger.debug("No matching rooms for Hotel ID: {}", hotelId);
+                continue; // Bỏ qua khách sạn không có phòng phù hợp
+            }
+
             HotelSearchResponse response = new HotelSearchResponse();
             response.setHotel(toHotelDTO(hotel));
-            response.setSimilarityScore(similarity);
+            response.setSimilarityScore(hotelSimilarity);
 
-            List<RoomType> hotelRooms = relevantRoomTypes.stream()
-                    .filter(rt -> rt.getHotel().getId().equals(hotelId)).toList();
-            List<RoomDTO> rooms = hotelRooms.stream()
-                    .map(this::toRoomDTO)
-                    .collect(Collectors.toList());
+            // Thêm thông tin phòng và similarity score của từng phòng
+            List<RoomDTO> rooms = new ArrayList<>();
+            for (RoomType room : hotelRooms) {
+                RoomDTO roomDTO = toRoomDTO(room);
+                // Tìm similarity score của phòng
+                Optional<Object[]> roomResultOpt = similarRooms.stream()
+                        .filter(r -> ((Integer) r[0]).equals(room.getId()))
+                        .findFirst();
+                if (roomResultOpt.isPresent()) {
+                    double roomSimilarity = (Double) roomResultOpt.get()[2];
+                    roomDTO.setSimilarityScore(roomSimilarity); // Giả sử RoomDTO có trường similarityScore
+                }
+                rooms.add(roomDTO);
+            }
             response.setRooms(rooms);
-//            response.setPlaces(List.of()); // Tạm thời để trống, có thể cập nhật sau
+//        response.setPlaces(List.of()); // Tạm thời để trống, có thể cập nhật sau
 
             responses.add(response);
         }
+
         return responses;
+    }
+
+    @Transactional
+    public List<HotelSearchResponse> searchHotelsV2(@Valid HotelSearchRequest request) {
+        logger.info("Processing search query (v2): {}", request.getQuery());
+
+        try {
+            // Gọi API Python để tạo embedding
+            float[] queryEmbedding = getQueryEmbedding(request.getQuery());
+            logger.debug("Query embedding created, length: {}", queryEmbedding.length);
+
+            // Tìm các khách sạn phù hợp
+            List<HotelSearchResponse> results = findMatchingHotelsV2(queryEmbedding);
+
+            // Sắp xếp theo độ tương đồng
+            results.sort(Comparator.comparingDouble(HotelSearchResponse::getSimilarityScore).reversed());
+            logger.info("Found {} matching hotels (v2)", results.size());
+
+            // Lưu lịch sử tìm kiếm chỉ khi user đã đăng nhập
+            String email = SecurityContextHolder.getContext().getAuthentication() != null
+                    ? SecurityContextHolder.getContext().getAuthentication().getName()
+                    : null;
+            if (email != null && !email.trim().isEmpty() && !email.equals("anonymousUser")) {
+                User user = userRepository.findByEmail(email)
+                        .orElseThrow(() -> new IllegalStateException("User not found with email: " + email));
+                saveSearchHistory(request.getQuery(), user);
+            } else {
+                logger.warn("Skipping search history save: No authenticated user or anonymous user detected");
+            }
+
+            return results;
+
+        } catch (Exception e) {
+            logger.error("Error processing search query (v2): {}", request.getQuery(), e);
+            throw new RuntimeException("Failed to process search query (v2)", e);
+        }
     }
 
     private List<HotelSearchResponse> findMatchingHotelsV2(float[] queryEmbedding) {
@@ -203,6 +296,8 @@ public class HotelSearchService {
         }
         return responses;
     }
+
+    @PreAuthorize("hasAnyAuthority('USER', 'ADMIN')") // Vẫn yêu cầu token vì liên quan đến dữ liệu địa điểm
     @Transactional(readOnly = true)
     public List<PlaceDTO> findNearbyPlaces(Integer hotelId, Double maxDistance, Integer limit) {
         logger.info("Finding nearby places for hotel ID: {}", hotelId);
@@ -287,90 +382,20 @@ public class HotelSearchService {
         return placeDTOs;
     }
     // Phương thức tính khoảng cách giữa hai điểm (latitude, longitude) bằng công thức Haversine
-    private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
-        final int R = 6371000; // Bán kính Trái Đất (mét)
-        double lat1Rad = Math.toRadians(lat1);
-        double lat2Rad = Math.toRadians(lat2);
-        double deltaLat = Math.toRadians(lat2 - lat1);
-        double deltaLon = Math.toRadians(lon2 - lon1);
-
-        double a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
-                Math.cos(lat1Rad) * Math.cos(lat2Rad) *
-                        Math.sin(deltaLon / 2) * Math.sin(deltaLon / 2);
-        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return R * c; // Khoảng cách tính bằng mét
-    }
-
-    // bắt buộc điền đầy đủ cả 3 trường
-//    @Transactional(readOnly = true)
-//    public List<HotelSearchResponse> searchHotelsByPriceGuestsAndDistrict(Integer maxPrice, Integer numberOfGuests, String district) {
-//        logger.info("Searching hotels with maxPrice: {}, numberOfGuests: {}, district: {}", maxPrice, numberOfGuests, district);
+//    private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+//        final int R = 6371000; // Bán kính Trái Đất (mét)
+//        double lat1Rad = Math.toRadians(lat1);
+//        double lat2Rad = Math.toRadians(lat2);
+//        double deltaLat = Math.toRadians(lat2 - lat1);
+//        double deltaLon = Math.toRadians(lon2 - lon1);
 //
-//        // Kiểm tra maxPrice
-//        if (maxPrice == null || maxPrice <= 0) {
-//            throw new IllegalArgumentException("maxPrice must be a positive value");
-//        }
-//
-//        // Kiểm tra numberOfGuests
-//        if (numberOfGuests == null || numberOfGuests <= 0) {
-//            throw new IllegalArgumentException("numberOfGuests must be a positive value");
-//        }
-//
-//        // Kiểm tra district (cho phép null để không lọc theo district)
-//        List<String> validDistricts = Arrays.asList("Liên Chiểu", "Hải Châu", "Thanh Khê", "Sơn Trà", "Ngũ Hành Sơn", "Cẩm Lệ");
-//        if (district != null && !district.isEmpty() && !validDistricts.contains(district)) {
-//            throw new IllegalArgumentException("District must be one of: " + validDistricts);
-//        }
-//
-//        // Tìm các phòng thỏa mãn maxPrice và numberOfGuests
-//        List<RoomType> matchingRooms = roomRepository.findByPriceAndGuests(Double.valueOf(maxPrice), numberOfGuests);
-//        if (matchingRooms.isEmpty()) {
-//            logger.info("No rooms found matching the criteria: maxPrice = {}, numberOfGuests = {}", maxPrice, numberOfGuests);
-//            return List.of();
-//        }
-//
-//        // Gom nhóm phòng theo hotelId
-//        Map<Integer, List<RoomType>> roomsByHotel = new HashMap<>();
-//        for (RoomType room : matchingRooms) {
-//            Integer hotelId = room.getHotel().getId();
-//            roomsByHotel.computeIfAbsent(hotelId, k -> new ArrayList<>()).add(room);
-//        }
-//
-//        // Lấy danh sách hotelId
-//        List<Integer> hotelIds = new ArrayList<>(roomsByHotel.keySet());
-//
-//        // Tìm khách sạn theo hotelIds và district (nếu có)
-//        List<Hotel> hotels;
-//        if (district != null && !district.isEmpty()) {
-//            hotels = hotelRepository.findAllByIdAndDistrict(hotelIds, district);
-//        } else {
-//            hotels = hotelRepository.findAllById(hotelIds);
-//        }
-//
-//        if (hotels.isEmpty()) {
-//            logger.warn("No hotels found for the matching rooms and district: {}", district);
-//            return List.of();
-//        }
-//
-//        // Tạo danh sách phản hồi
-//        List<HotelSearchResponse> responses = new ArrayList<>();
-//        for (Hotel hotel : hotels) {
-//            HotelSearchResponse response = new HotelSearchResponse();
-//            response.setHotel(toHotelDTO(hotel));
-//
-//            List<RoomType> hotelRooms = roomsByHotel.get(hotel.getId());
-//            List<RoomDTO> roomDTOs = hotelRooms.stream()
-//                    .map(this::toRoomDTO)
-//                    .collect(Collectors.toList());
-//            response.setRooms(roomDTOs);
-//            response.setPlaces(List.of()); // Tạm thời để trống, có thể cập nhật sau
-//
-//            responses.add(response);
-//        }
-//
-//        logger.info("Found {} hotels with matching rooms in district: {}", responses.size(), district);
-//        return responses;
+//        double a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+//                Math.cos(lat1Rad) * Math.cos(lat2Rad) *
+//                        Math.sin(deltaLon / 2) * Math.sin(deltaLon / 2);
+//        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+//        return R * c; // Khoảng cách tính bằng mét
 //    }
+
     @Transactional(readOnly = true)
     public List<HotelSearchResponse> searchHotelsByPriceGuestsAndDistrict(Integer maxPrice, Integer numberOfGuests, String district) {
         logger.info("Searching hotels with maxPrice: {}, numberOfGuests: {}, district: {}", maxPrice, numberOfGuests, district);
@@ -439,12 +464,13 @@ public class HotelSearchService {
             HotelSearchResponse response = new HotelSearchResponse();
             response.setHotel(toHotelDTO(hotel));
 
-            List<RoomType> hotelRooms = roomsByHotel.get(hotel.getId());
-            List<RoomDTO> roomDTOs = hotelRooms.stream()
-                    .map(this::toRoomDTO)
-                    .collect(Collectors.toList());
-            response.setRooms(roomDTOs);
-            response.setPlaces(List.of()); // Tạm thời để trống, có thể cập nhật sau
+            // thêm logic trả về room và place nếu cần
+//            List<RoomType> hotelRooms = roomsByHotel.get(hotel.getId());
+//            List<RoomDTO> roomDTOs = hotelRooms.stream()
+//                    .map(this::toRoomDTO)
+//                    .collect(Collectors.toList());
+//            response.setRooms(roomDTOs);
+//            response.setPlaces(List.of());
 
             responses.add(response);
         }
@@ -453,57 +479,16 @@ public class HotelSearchService {
         return responses;
     }
 
-    // ko dùng nữa
-    @Transactional(readOnly = true)
-    public List<HotelSearchResponse> searchHotelsByPriceAndGuests(Integer maxPrice, Integer numberOfGuests) {
-        logger.info("Searching hotels with maxPrice: {} and numberOfGuests: {}", maxPrice, numberOfGuests);
-
-        if (maxPrice == null || maxPrice <= 0) {
-            throw new IllegalArgumentException("maxPrice must be a positive value");
+    private void saveSearchHistory(String query, User user) {
+        try {
+            SearchHistory history = new SearchHistory(user, query);
+            searchHistoryRepository.save(history);
+            logger.info("Search history saved for user: {}", user.getEmail());
+        } catch (Exception e) {
+            logger.error("Failed to save search history for user {}: {}", user.getEmail(), e.getMessage());
+            // Không ném lỗi để không ảnh hưởng đến quá trình tìm kiếm
         }
-        if (numberOfGuests == null || numberOfGuests <= 0) {
-            throw new IllegalArgumentException("numberOfGuests must be a positive value");
-        }
-
-        List<RoomType> matchingRooms = roomRepository.findByPriceAndGuests(Double.valueOf(maxPrice), numberOfGuests);
-        if (matchingRooms.isEmpty()) {
-            logger.info("No rooms found matching the criteria: maxPrice = {}, numberOfGuests = {}", maxPrice, numberOfGuests);
-            return List.of();
-        }
-
-        Map<Integer, List<RoomType>> roomsByHotel = new HashMap<>();
-        for (RoomType room : matchingRooms) {
-            Integer hotelId = room.getHotel().getId();
-            roomsByHotel.computeIfAbsent(hotelId, k -> new ArrayList<>()).add(room);
-        }
-
-        List<Integer> hotelIds = new ArrayList<>(roomsByHotel.keySet());
-        List<Hotel> hotels = hotelRepository.findAllById(hotelIds);
-        if (hotels.isEmpty()) {
-            logger.warn("No hotels found for the matching rooms");
-            return List.of();
-        }
-
-        List<HotelSearchResponse> responses = new ArrayList<>();
-        for (Hotel hotel : hotels) {
-            HotelSearchResponse response = new HotelSearchResponse();
-            response.setHotel(toHotelDTO(hotel));
-
-            List<RoomType> hotelRooms = roomsByHotel.get(hotel.getId());
-            List<RoomDTO> roomDTOs = hotelRooms.stream()
-                    .map(this::toRoomDTO)
-                    .collect(Collectors.toList());
-            response.setRooms(roomDTOs);
-            response.setPlaces(List.of()); // Tạm thời để trống, có thể cập nhật sau
-
-            responses.add(response);
-        }
-
-        logger.info("Found {} hotels with matching rooms", responses.size());
-        return responses;
     }
-
-
 
     private float[] getQueryEmbedding(String query) {
         try {
@@ -541,30 +526,30 @@ public class HotelSearchService {
     }
 
 
-    private double calculateCosineSimilarity(float[] vectorA, float[] vectorB) {
-        if (vectorA.length != vectorB.length) {
-            throw new IllegalArgumentException("Vectors must have the same length");
-        }
-
-        double dotProduct = 0.0;
-        double normA = 0.0;
-        double normB = 0.0;
-
-        for (int i = 0; i < vectorA.length; i++) {
-            dotProduct += vectorA[i] * vectorB[i];
-            normA += vectorA[i] * vectorA[i];
-            normB += vectorB[i] * vectorB[i];
-        }
-
-        normA = Math.sqrt(normA);
-        normB = Math.sqrt(normB);
-
-        if (normA == 0 || normB == 0) {
-            return 0.0;
-        }
-
-        return dotProduct / (normA * normB);
-    }
+//    private double calculateCosineSimilarity(float[] vectorA, float[] vectorB) {
+//        if (vectorA.length != vectorB.length) {
+//            throw new IllegalArgumentException("Vectors must have the same length");
+//        }
+//
+//        double dotProduct = 0.0;
+//        double normA = 0.0;
+//        double normB = 0.0;
+//
+//        for (int i = 0; i < vectorA.length; i++) {
+//            dotProduct += vectorA[i] * vectorB[i];
+//            normA += vectorA[i] * vectorA[i];
+//            normB += vectorB[i] * vectorB[i];
+//        }
+//
+//        normA = Math.sqrt(normA);
+//        normB = Math.sqrt(normB);
+//
+//        if (normA == 0 || normB == 0) {
+//            return 0.0;
+//        }
+//
+//        return dotProduct / (normA * normB);
+//    }
 
     private String arrayToString(float[] array) {
         StringBuilder sb = new StringBuilder("[");

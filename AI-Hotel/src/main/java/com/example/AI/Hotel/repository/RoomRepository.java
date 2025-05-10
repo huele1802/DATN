@@ -11,7 +11,9 @@ import org.springframework.data.domain.Pageable;
 
 public interface RoomRepository extends JpaRepository<RoomType, Integer> {
     Page<RoomType> findAll(Pageable pageable); // phân trang
-    List<RoomType> findByHotelIdIn(List<Integer> hotelIds);
+
+    // Truy vấn lấy danh sách RoomType dựa trên danh sách ID
+    List<RoomType> findByIdIn(@Param("roomIds") List<Integer> roomIds);
 
     //  tìm phòng chỉ theo giá
     @Query("SELECT r FROM RoomType r WHERE r.price <= :maxPrice")
@@ -30,4 +32,23 @@ public interface RoomRepository extends JpaRepository<RoomType, Integer> {
     @Query("SELECT rt FROM RoomType rt WHERE rt.hotel.id = :hotelId")
     List<RoomType> findByHotelId(@Param("hotelId") Integer hotelId);
 
+    //lấy danh sách hotel_id từ danh sách room_id
+    @Query("SELECT rt.hotel.id FROM RoomType rt WHERE rt.id IN :roomIds")
+    List<Integer> findHotelIdsByRoomIds(@Param("roomIds") List<Integer> roomIds);
+
+    //CAST(:queryEmbedding AS vector) để chuyển queryEmbedding từ kiểu character varying (chuỗi) thành kiểu vector
+    @Query(value = """
+        SELECT 
+            re.room_id,
+            re.embedding,
+            (1 - (re.embedding <=> CAST(:queryEmbedding AS vector))) AS similarity
+        FROM room_embeddings re
+        WHERE (1 - (re.embedding <=> CAST(:queryEmbedding AS vector))) >= :threshold
+        ORDER BY similarity DESC
+        LIMIT :limit
+        """, nativeQuery = true)
+    List<Object[]> findTopSimilarRooms(
+            @Param("queryEmbedding") String queryEmbedding,
+            @Param("threshold") double threshold,
+            @Param("limit") int limit);
 }

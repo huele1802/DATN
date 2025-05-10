@@ -61,3 +61,25 @@ CREATE TABLE place_embeddings(
         REFERENCES places (id)
         ON DELETE CASCADE
 )
+
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password VARCHAR(255),
+    full_name VARCHAR(255),
+    phone_number VARCHAR(20),
+    date_of_birth DATE,
+    address TEXT,
+    avatar_url TEXT,
+    role VARCHAR(20) NOT NULL CHECK (role IN ('USER', 'ADMIN')),
+    google_id VARCHAR(255) UNIQUE
+);
+
+CREATE TABLE search_history (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    query TEXT NOT NULL,
+    search_type VARCHAR(50),
+    search_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);

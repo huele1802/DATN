@@ -1,0 +1,37 @@
+package com.example.AI.Hotel.dto;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
+import jakarta.validation.constraints.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDate;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class RegisterRequest {
+    @NotEmpty(message = "MISSING_REQUIRED_FIELDS: Email cannot be empty")
+    @Email(message = "INVALID_EMAIL_FORMAT: Email must be a valid email address")
+    private String email;
+
+    @NotEmpty(message = "MISSING_REQUIRED_FIELDS: Password cannot be empty")
+    @Size(min = 6, message = "INVALID_PASSWORD_FORMAT: Password must be at least 6 characters")
+    private String password;
+
+    @NotEmpty(message = "MISSING_REQUIRED_FIELDS: Full name cannot be empty")
+    @Size(min = 2, max = 100, message = "INVALID_FULLNAME_FORMAT: Full name must be between 2 and 100 characters")
+    private String fullName;
+
+    @Size(min = 10, max = 15, message = "INVALID_PHONE_FORMAT: Phone number must be between 10 and 15 characters")
+    private String phoneNumber;
+
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd") // Định dạng mặc định
+    private LocalDate dateOfBirth;
+
+    @Size(max = 255, message = "INVALID_ADDRESS_FORMAT: Address must not exceed 255 characters")
+    private String address;
+
+
+}

@@ -42,6 +42,10 @@ public class HotelSearchController {
         List<HotelSearchResponse> responses = hotelSearchService.searchHotels(request);
         log.info("Search completed for query: {}, found {} hotels", request.getQuery(), responses.size());
 
+        // Kiểm tra số lượng phòng trong các khách sạn
+        boolean hasRooms = responses.stream().anyMatch(response -> !response.getRooms().isEmpty());
+        log.debug("Search result contains rooms: {}", hasRooms);
+
         Pageable pageable = PageRequest.of(page - 1, size);
         int start = (int) pageable.getOffset();
         int end = Math.min(start + pageable.getPageSize(), responses.size());
@@ -57,10 +61,15 @@ public class HotelSearchController {
         response.put("currentPage", pagedResult.getNumber() + 1); // Chuyển về one-based index (bắt đầu từ 1)
         response.put("totalItems", pagedResult.getTotalElements());
         response.put("totalPages", pagedResult.getTotalPages());
+        response.put("hasRooms", hasRooms); // Thêm thông tin về trạng thái phòng
 
         if (pagedResponses.isEmpty() && responses.isEmpty()) {
             log.warn("No hotels found for query: {}", request.getQuery());
             response.put("message", "Không tìm thấy khách sạn phù hợp");
+            return ResponseEntity.status(404).body(response);
+        } else if (pagedResponses.isEmpty() && !hasRooms) {
+            log.warn("No rooms found for query: {}, but hotels exist", request.getQuery());
+            response.put("message", "Không tìm thấy phòng phù hợp với yêu cầu");
             return ResponseEntity.status(404).body(response);
         }
 
