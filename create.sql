@@ -74,6 +74,7 @@ CREATE TABLE users (
     role VARCHAR(20) NOT NULL CHECK (role IN ('USER', 'ADMIN')),
     google_id VARCHAR(255) UNIQUE
 );
+ALTER TABLE users ADD COLUMN reset_token VARCHAR(10), ADD COLUMN reset_token_expiry TIMESTAMP;
 
 CREATE TABLE search_history (
     id SERIAL PRIMARY KEY,

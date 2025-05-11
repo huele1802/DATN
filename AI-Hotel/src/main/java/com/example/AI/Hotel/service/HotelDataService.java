@@ -244,7 +244,7 @@ public class HotelDataService {
         HotelDTO hotelDTO = new HotelDTO();
         hotelDTO.setId(hotel.getId());
         hotelDTO.setName(hotel.getName());
-//        hotelDTO.setAddress(hotel.getAddress());
+        hotelDTO.setAddress(hotel.getAddress());
         hotelDTO.setDistrict(hotel.getDistrict());
         hotelDTO.setDescription(hotel.getDescription());
         hotelDTO.setHotelLink(hotel.getHotelLink());

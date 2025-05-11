@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "users")
@@ -42,6 +43,14 @@ public class User {
 
     @Column(unique = true)
     private String googleId;
+
+    // Trường mới để lưu OTP
+    @Column(name = "reset_token", length = 10)
+    private String resetToken;
+
+    // Trường mới để lưu thời gian hết hạn của OTP
+    @Column(name = "reset_token_expiry")
+    private LocalDateTime resetTokenExpiry;
 
     public enum Role {
         USER, ADMIN

@@ -2,29 +2,31 @@ package com.example.AI.Hotel.controller;
 
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
+import com.example.AI.Hotel.dto.ForgotPasswordRequest;
+import com.example.AI.Hotel.dto.ResetPasswordRequest;
 import com.example.AI.Hotel.dto.SearchHistoryDTO;
 import com.example.AI.Hotel.model.SearchHistory;
 import com.example.AI.Hotel.model.User;
 import com.example.AI.Hotel.repository.SearchHistoryRepository;
 import com.example.AI.Hotel.repository.UserRepository;
+import com.example.AI.Hotel.service.MailService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.security.Principal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
-import java.util.Base64;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @RestController
 @RequestMapping("/user")
@@ -38,6 +40,12 @@ public class UserController {
 
     @Autowired
     private Cloudinary cloudinary;
+
+    @Autowired
+    private MailService mailService;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     @GetMapping("/search-history")
     public ResponseEntity<List<SearchHistoryDTO>> getSearchHistory() {
@@ -162,7 +170,57 @@ public class UserController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
+    @PostMapping("/forgot-password")
+    public ResponseEntity<Map<String, Object>> forgotPassword(@RequestBody ForgotPasswordRequest request) {
+        Map<String, Object> response = new HashMap<>();
 
+        Optional<User> userOptional = userRepository.findByEmail(request.getEmail());
+        if (userOptional.isEmpty()) {
+            response.put("message", "Email not found");
+            response.put("status", HttpStatus.NOT_FOUND.value());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        }
+
+        User user = userOptional.get();
+
+        // Sinh và gửi mã OTP
+        String otp = mailService.sendOtp(user.getEmail());
+        user.setResetToken(otp); // Lưu OTP vào resetToken
+        user.setResetTokenExpiry(LocalDateTime.now().plusMinutes(10)); // OTP hết hạn sau 10 phút
+        userRepository.save(user);
+
+        response.put("message", "OTP has been sent to your email");
+        response.put("status", HttpStatus.OK.value());
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<Map<String, Object>> resetPassword(@RequestBody ResetPasswordRequest request) {
+        Map<String, Object> response = new HashMap<>();
+
+        Optional<User> userOptional = userRepository.findByResetToken(request.getToken());
+        if (userOptional.isEmpty()) {
+            response.put("message", "Invalid or expired OTP");
+            response.put("status", HttpStatus.BAD_REQUEST.value());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
+
+        User user = userOptional.get();
+        if (user.getResetTokenExpiry().isBefore(LocalDateTime.now())) {
+            response.put("message", "OTP has expired");
+            response.put("status", HttpStatus.BAD_REQUEST.value());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        user.setResetToken(null);
+        user.setResetTokenExpiry(null);
+        userRepository.save(user);
+
+        response.put("message", "Password reset successfully");
+        response.put("status", HttpStatus.OK.value());
+        return ResponseEntity.ok(response);
+    }
     private String extractPublicId(String url) {
         String[] parts = url.split("/");
         String fileName = parts[parts.length - 1];
