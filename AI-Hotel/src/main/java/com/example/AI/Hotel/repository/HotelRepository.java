@@ -48,4 +48,17 @@ public interface HotelRepository extends JpaRepository<Hotel, Integer> {
     );
 
     Optional<Hotel> findBySlug(String slug);
+
+    @Query(value = "SELECT h.id, h.name, h.address, h.district, h.description, h.hotel_link, h.rating_stars, " +
+            "h.facilities, h.highlights, h.reviews, h.image_urls, h.room_services, h.slug, " +
+            "ST_AsText(h.coordinates) AS coordinates_text, " +
+            "ST_Distance(h.coordinates, p.coordinates) AS distance_in_meters " +
+            "FROM hotels h, places p " +
+            "WHERE p.id = :placeId " +
+            "AND ST_DWithin(h.coordinates, p.coordinates, :maxDistance) " +
+            "ORDER BY distance_in_meters " +
+            "LIMIT :limit", nativeQuery = true)
+    List<Object[]> findNearbyHotels(@Param("placeId") Integer placeId,
+                                    @Param("maxDistance") Double maxDistance,
+                                    @Param("limit") Integer limit);
 }

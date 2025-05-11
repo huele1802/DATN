@@ -75,6 +75,7 @@ CREATE TABLE users (
     google_id VARCHAR(255) UNIQUE
 );
 ALTER TABLE users ADD COLUMN reset_token VARCHAR(10), ADD COLUMN reset_token_expiry TIMESTAMP;
+ALTER TABLE users ADD COLUMN is_deleted BOOLEAN NOT NULL DEFAULT FALSE;
 
 CREATE TABLE search_history (
     id SERIAL PRIMARY KEY,
@@ -83,4 +84,13 @@ CREATE TABLE search_history (
     search_type VARCHAR(50),
     search_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE wishlist (
+    id SERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    hotel_id BIGINT NOT NULL,
+    CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT fk_hotel FOREIGN KEY (hotel_id) REFERENCES hotels(id) ON DELETE CASCADE,
+    CONSTRAINT unique_user_hotel UNIQUE (user_id, hotel_id)
 );

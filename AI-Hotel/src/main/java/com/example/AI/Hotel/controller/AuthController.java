@@ -65,16 +65,30 @@ public class AuthController {
     }
 
 //    @PostMapping("/login")
-//    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
-//        Authentication authentication = authenticationManager.authenticate(
-//                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
-//        String email = authentication.getName();
-//        User user = userRepository.findByEmail(email)
-//                .orElseThrow(() -> new IllegalStateException("User not found"));
-//        String token = jwtUtil.generateToken(email, user.getRole().name());
-//        return ResponseEntity.ok(new LoginResponse(token));
+//    public ResponseEntity<Map<String, Object>> login(@Valid @RequestBody LoginRequest request) {
+//        Map<String, Object> response = new HashMap<>();
+//
+//        try {
+//            Authentication authentication = authenticationManager.authenticate(
+//                    new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
+//
+//            String email = authentication.getName();
+//            User user = userRepository.findByEmail(email)
+//                    .orElseThrow(() -> new IllegalStateException("User not found"));
+//
+//            String token = jwtUtil.generateToken(email, user.getRole().name());
+//
+//            response.put("status", HttpStatus.OK.value());
+//            response.put("message", "Login successful");
+//            response.put("token", token);
+//            return ResponseEntity.ok(response);
+//
+//        } catch (Exception ex) {
+//            response.put("status", HttpStatus.UNAUTHORIZED.value());
+//            response.put("message", "Invalid email or password");
+//            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+//        }
 //    }
-
     @PostMapping("/login")
     public ResponseEntity<Map<String, Object>> login(@Valid @RequestBody LoginRequest request) {
         Map<String, Object> response = new HashMap<>();
@@ -86,6 +100,13 @@ public class AuthController {
             String email = authentication.getName();
             User user = userRepository.findByEmail(email)
                     .orElseThrow(() -> new IllegalStateException("User not found"));
+
+            // Kiểm tra trạng thái isDeleted
+            if (user.isDeleted()) {
+                response.put("status", HttpStatus.UNAUTHORIZED.value());
+                response.put("message", "Account is disabled");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+            }
 
             String token = jwtUtil.generateToken(email, user.getRole().name());
 
@@ -100,7 +121,6 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
         }
     }
-
 
     // api tạo admin
 //    @PostMapping("/create-admin")

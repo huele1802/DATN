@@ -11,6 +11,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -171,6 +172,32 @@ public class HotelSearchController {
             Map<String, Object> errorResponse = new HashMap<>();
             errorResponse.put("error", "Lỗi máy chủ: " + e.getMessage());
             return ResponseEntity.status(500).body(errorResponse);
+        }
+    }
+    @GetMapping("/{placeId}/nearby-hotels")
+    public ResponseEntity<Map<String, Object>> getNearbyHotels(
+            @PathVariable Integer placeId,
+            @RequestParam(required = false) Double maxDistance,
+            @RequestParam(required = false) Integer limit) {
+        try {
+            List<HotelDTO> nearbyHotels = hotelSearchService.findNearbyHotels(placeId, maxDistance, limit);
+            Map<String, Object> response = new HashMap<>();
+
+            if (nearbyHotels.isEmpty()) {
+                log.warn("No nearby hotels found for placeId: {}", placeId);
+                response.put("message", "Không tìm thấy khách sạn dưới 5km gần địa điểm");
+                response.put("hotels", nearbyHotels);
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+            }
+
+            response.put("hotels", nearbyHotels);
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            log.error("Error finding nearby hotels for placeId: {}", placeId, e);
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Lỗi máy chủ: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
 

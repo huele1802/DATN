@@ -297,7 +297,7 @@ public class HotelSearchService {
         return responses;
     }
 
-    @PreAuthorize("hasAnyAuthority('USER', 'ADMIN')") // Vẫn yêu cầu token vì liên quan đến dữ liệu địa điểm
+//    @PreAuthorize("hasAnyAuthority('USER', 'ADMIN')") // Vẫn yêu cầu token vì liên quan đến dữ liệu địa điểm
     @Transactional(readOnly = true)
     public List<PlaceDTO> findNearbyPlaces(Integer hotelId, Double maxDistance, Integer limit) {
         logger.info("Finding nearby places for hotel ID: {}", hotelId);
@@ -381,20 +381,171 @@ public class HotelSearchService {
         logger.info("Found {} nearby places for hotel ID: {}", placeDTOs.size(), hotelId);
         return placeDTOs;
     }
-    // Phương thức tính khoảng cách giữa hai điểm (latitude, longitude) bằng công thức Haversine
-//    private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
-//        final int R = 6371000; // Bán kính Trái Đất (mét)
-//        double lat1Rad = Math.toRadians(lat1);
-//        double lat2Rad = Math.toRadians(lat2);
-//        double deltaLat = Math.toRadians(lat2 - lat1);
-//        double deltaLon = Math.toRadians(lon2 - lon1);
-//
-//        double a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
-//                Math.cos(lat1Rad) * Math.cos(lat2Rad) *
-//                        Math.sin(deltaLon / 2) * Math.sin(deltaLon / 2);
-//        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-//        return R * c; // Khoảng cách tính bằng mét
-//    }
+    @Transactional(readOnly = true)
+    public List<HotelDTO> findNearbyHotels(Integer placeId, Double maxDistance, Integer limit) {
+        logger.info("Finding nearby hotels for place ID: {}", placeId);
+
+        // Kiểm tra xem địa điểm có tồn tại không
+        Optional<Place> placeOpt = placeRepository.findById(placeId);
+        if (placeOpt.isEmpty()) {
+            logger.warn("Place not found for ID: {}", placeId);
+            throw new RuntimeException("Place not found with ID: " + placeId);
+        }
+
+        // Nếu maxDistance không được cung cấp, sử dụng giá trị mặc định (5km)
+        double effectiveMaxDistance = (maxDistance != null) ? maxDistance : DEFAULT_MAX_DISTANCE_METERS;
+        // Nếu limit không được cung cấp, trả về tất cả khách sạn
+        int effectiveLimit = (limit != null) ? limit : Integer.MAX_VALUE;
+
+        // Tìm các khách sạn gần
+        List<Object[]> nearbyHotels = hotelRepository.findNearbyHotels(placeId, effectiveMaxDistance, effectiveLimit);
+        List<HotelDTO> hotelDTOs = new ArrayList<>();
+
+        for (Object[] result : nearbyHotels) {
+            Object[] hotelData = result;
+            Double distanceInMeters = (Double) hotelData[14]; // Vị trí của distance_in_meters
+
+            // Log để kiểm tra kiểu dữ liệu
+            for (int i = 0; i < hotelData.length; i++) {
+                logger.debug("Column {}: Type = {}, Value = {}", i, (hotelData[i] != null ? hotelData[i].getClass().getName() : "null"), hotelData[i]);
+            }
+
+            // Ánh xạ từ Object[] sang Hotel
+            Hotel hotel = new Hotel();
+            hotel.setId(hotelData[0] != null ? Integer.valueOf(hotelData[0].toString()) : null);
+            hotel.setName((String) hotelData[1]);
+            hotel.setAddress((String) hotelData[2]);
+            hotel.setDistrict((String) hotelData[3]);
+            hotel.setDescription((String) hotelData[4]);
+            hotel.setHotelLink((String) hotelData[5]);
+            hotel.setRatingStars(hotelData[6] != null ? Integer.valueOf(hotelData[6].toString()) : null);
+            if (hotelData[7] != null) {
+                try {
+                    String facilitiesStr = hotelData[7].toString().trim();
+                    if (!facilitiesStr.isEmpty()) {
+                        List<String> facilities = objectMapper.readValue(facilitiesStr, new TypeReference<List<String>>() {});
+                        hotel.setFacilities(facilities);
+                    } else {
+                        logger.warn("Empty facilities for hotel ID {}", hotelData[0]);
+                        hotel.setFacilities(null);
+                    }
+                } catch (Exception e) {
+                    logger.error("Failed to parse facilities for hotel ID {}: {}", hotelData[0], e.getMessage());
+                    hotel.setFacilities(null);
+                }
+            }
+            if (hotelData[8] != null) {
+                try {
+                    String highlightsStr = hotelData[8].toString().trim();
+                    if (!highlightsStr.isEmpty()) {
+                        Map<String, List<String>> highlights = objectMapper.readValue(highlightsStr, new TypeReference<Map<String, List<String>>>() {});
+                        hotel.setHighlights(highlights);
+                    } else {
+                        logger.warn("Empty highlights for hotel ID {}", hotelData[0]);
+                        hotel.setHighlights(null);
+                    }
+                } catch (Exception e) {
+                    logger.error("Failed to parse highlights for hotel ID {}: {}", hotelData[0], e.getMessage());
+                    hotel.setHighlights(null);
+                }
+            }
+            if (hotelData[9] != null) {
+                try {
+                    String reviewsStr = hotelData[9].toString().trim();
+                    if (!reviewsStr.isEmpty()) {
+                        Map<String, Double> reviews = objectMapper.readValue(reviewsStr, new TypeReference<Map<String, Double>>() {});
+                        hotel.setReviews(reviews);
+                    } else {
+                        logger.warn("Empty reviews for hotel ID {}", hotelData[0]);
+                        hotel.setReviews(null);
+                    }
+                } catch (Exception e) {
+                    logger.error("Failed to parse reviews for hotel ID {}: {}", hotelData[0], e.getMessage());
+                    hotel.setReviews(null);
+                }
+            }
+            if (hotelData[10] != null) {
+                try {
+                    String imageUrlsStr = hotelData[10].toString().trim();
+                    if (!imageUrlsStr.isEmpty()) {
+                        List<String> imageUrls = objectMapper.readValue(imageUrlsStr, new TypeReference<List<String>>() {});
+                        hotel.setImageUrls(imageUrls);
+                    } else {
+                        logger.warn("Empty imageUrls for hotel ID {}", hotelData[0]);
+                        hotel.setImageUrls(null);
+                    }
+                } catch (Exception e) {
+                    logger.error("Failed to parse imageUrls for hotel ID {}: {}", hotelData[0], e.getMessage());
+                    hotel.setImageUrls(null);
+                }
+            }
+            if (hotelData[11] != null) {
+                try {
+                    String roomServicesStr = hotelData[11].toString().trim();
+                    if (!roomServicesStr.isEmpty()) {
+                        Map<String, List<String>> roomServices = objectMapper.readValue(roomServicesStr, new TypeReference<Map<String, List<String>>>() {});
+                        hotel.setRoomServices(roomServices);
+                    } else {
+                        logger.warn("Empty roomServices for hotel ID {}", hotelData[0]);
+                        hotel.setRoomServices(null);
+                    }
+                } catch (Exception e) {
+                    logger.error("Failed to parse roomServices for hotel ID {}: {}", hotelData[0], e.getMessage());
+                    hotel.setRoomServices(null);
+                }
+            }
+            hotel.setSlug((String) hotelData[12]);
+
+            // Xử lý tọa độ từ cột coordinates (WKT)
+            if (hotelData[13] != null) {
+                try {
+                    String coordinatesStr = hotelData[13].toString().trim();
+                    if (!coordinatesStr.isEmpty()) {
+                        GeometryFactory geometryFactory = new GeometryFactory();
+                        WKTReader reader = new WKTReader(geometryFactory);
+                        Point coordinates = (Point) reader.read(coordinatesStr);
+                        hotel.setCoordinates(coordinates);
+                    } else {
+                        logger.warn("Empty coordinates for hotel ID {}", hotelData[0]);
+                        hotel.setCoordinates(null);
+                    }
+                } catch (Exception e) {
+                    logger.error("Failed to parse coordinates for hotel ID {}: {}", hotelData[0], e.getMessage());
+                    hotel.setCoordinates(null);
+                }
+            }
+
+            // Chuyển đổi Hotel sang HotelDTO
+            HotelDTO hotelDTO = new HotelDTO();
+            hotelDTO.setId(hotel.getId());
+            hotelDTO.setName(hotel.getName());
+            hotelDTO.setAddress(hotel.getAddress());
+            hotelDTO.setDistrict(hotel.getDistrict());
+            hotelDTO.setDescription(hotel.getDescription());
+            hotelDTO.setHotelLink(hotel.getHotelLink());
+            hotelDTO.setRatingStars(hotel.getRatingStars());
+            hotelDTO.setFacilities(hotel.getFacilities());
+            hotelDTO.setHighlights(hotel.getHighlights());
+            hotelDTO.setReviews(hotel.getReviews());
+            hotelDTO.setImageUrls(hotel.getImageUrls());
+            hotelDTO.setRoomServices(hotel.getRoomServices());
+            hotelDTO.setSlug(hotel.getSlug());
+            // Ánh xạ latitude và longitude từ coordinates
+            if (hotel.getCoordinates() != null) {
+                hotelDTO.setLatitude(hotel.getCoordinates().getY());
+                hotelDTO.setLongitude(hotel.getCoordinates().getX());
+            } else {
+                hotelDTO.setLatitude(null);
+                hotelDTO.setLongitude(null);
+            }
+            hotelDTO.setDistanceInMeters(distanceInMeters != null ? distanceInMeters : 0.0);
+
+            hotelDTOs.add(hotelDTO);
+        }
+
+        logger.info("Found {} nearby hotels for place ID: {}", hotelDTOs.size(), placeId);
+        return hotelDTOs;
+    }
 
     @Transactional(readOnly = true)
     public List<HotelSearchResponse> searchHotelsByPriceGuestsAndDistrict(Integer maxPrice, Integer numberOfGuests, String district) {

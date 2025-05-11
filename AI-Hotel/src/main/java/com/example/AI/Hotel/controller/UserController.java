@@ -2,16 +2,21 @@ package com.example.AI.Hotel.controller;
 
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
-import com.example.AI.Hotel.dto.ForgotPasswordRequest;
-import com.example.AI.Hotel.dto.ResetPasswordRequest;
-import com.example.AI.Hotel.dto.SearchHistoryDTO;
+import com.example.AI.Hotel.dto.*;
+import com.example.AI.Hotel.model.Hotel;
 import com.example.AI.Hotel.model.SearchHistory;
 import com.example.AI.Hotel.model.User;
+import com.example.AI.Hotel.model.Wishlist;
+import com.example.AI.Hotel.repository.HotelRepository;
 import com.example.AI.Hotel.repository.SearchHistoryRepository;
 import com.example.AI.Hotel.repository.UserRepository;
+import com.example.AI.Hotel.repository.WishlistRepository;
 import com.example.AI.Hotel.service.MailService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -46,6 +51,11 @@ public class UserController {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private WishlistRepository wishlistRepository;
+    @Autowired
+    private HotelRepository hotelRepository;
 
     @GetMapping("/search-history")
     public ResponseEntity<List<SearchHistoryDTO>> getSearchHistory() {
@@ -235,5 +245,110 @@ public class UserController {
                 .orElseThrow(() -> new IllegalStateException("User not found"));
         return ResponseEntity.ok(user);
     }
+
+    @GetMapping("/wishlist")
+    public ResponseEntity<PagedResponse<HotelDTO>> getWishlist(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalStateException("User not found"));
+
+        Pageable pageable = PageRequest.of(page - 1, size);
+        Page<Wishlist> wishlistPage = wishlistRepository.findByUserId(user.getId(), pageable);
+
+        List<HotelDTO> hotelDTOs = wishlistPage.getContent().stream()
+                .map(w -> {
+                    Hotel hotel = w.getHotel();
+                    HotelDTO hotelDTO = new HotelDTO();
+                    hotelDTO.setId(hotel.getId());
+                    hotelDTO.setName(hotel.getName());
+                    hotelDTO.setAddress(hotel.getAddress());
+                    hotelDTO.setDistrict(hotel.getDistrict());
+                    hotelDTO.setDescription(hotel.getDescription());
+                    hotelDTO.setHotelLink(hotel.getHotelLink());
+                    hotelDTO.setRatingStars(hotel.getRatingStars());
+                    hotelDTO.setFacilities(hotel.getFacilities());
+                    hotelDTO.setHighlights(hotel.getHighlights());
+                    hotelDTO.setReviews(hotel.getReviews());
+                    hotelDTO.setImageUrls(hotel.getImageUrls());
+                    hotelDTO.setRoomServices(hotel.getRoomServices());
+                    hotelDTO.setSlug(hotel.getSlug());
+                    hotelDTO.setLatitude(hotel.getCoordinates() != null ? hotel.getCoordinates().getY() : null);
+                    hotelDTO.setLongitude(hotel.getCoordinates() != null ? hotel.getCoordinates().getX() : null);
+                    return hotelDTO;
+                })
+                .toList();
+
+//        PagedResponse<HotelDTO> response = new PagedResponse<>(
+//                hotelDTOs,
+//                wishlistPage.getNumber(),
+//                wishlistPage.getSize(),
+//                wishlistPage.getTotalElements(),
+//                wishlistPage.getTotalPages(),
+//                wishlistPage.isLast()
+//        );
+        PagedResponse<HotelDTO> response = new PagedResponse<>(
+                hotelDTOs,
+                page - 1, // Sử dụng page gốc (trừ 1 đã áp dụng ở trên)
+                size,
+                wishlistPage.getTotalElements(),
+                wishlistPage.getTotalPages(),
+                wishlistPage.isLast()
+        );
+
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/wishlist/{hotelId}")
+    public ResponseEntity<Map<String, Object>> addToWishlist(@PathVariable Integer hotelId) {
+        Map<String, Object> response = new HashMap<>();
+
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalStateException("User not found"));
+
+        Hotel hotel = hotelRepository.findById(hotelId)
+                .orElseThrow(() -> new IllegalStateException("Hotel not found"));
+
+        Optional<Wishlist> existingWishlist = wishlistRepository.findByUserIdAndHotelId(user.getId(), hotelId);
+        if (existingWishlist.isPresent()) {
+            response.put("message", "Hotel is already in your wishlist");
+            response.put("status", HttpStatus.BAD_REQUEST.value());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
+
+        Wishlist wishlist = new Wishlist();
+        wishlist.setUser(user);
+        wishlist.setHotel(hotel);
+        wishlistRepository.save(wishlist);
+
+        response.put("message", "Hotel added to wishlist successfully");
+        response.put("status", HttpStatus.OK.value());
+        return ResponseEntity.ok(response);
+    }
+
+    @DeleteMapping("/wishlist/{hotelId}")
+    public ResponseEntity<Map<String, Object>> removeFromWishlist(@PathVariable Integer hotelId) {
+        Map<String, Object> response = new HashMap<>();
+
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalStateException("User not found"));
+
+        Optional<Wishlist> wishlist = wishlistRepository.findByUserIdAndHotelId(user.getId(), hotelId);
+        if (wishlist.isEmpty()) {
+            response.put("message", "Hotel not found in your wishlist");
+            response.put("status", HttpStatus.NOT_FOUND.value());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        }
+
+        wishlistRepository.delete(wishlist.get());
+
+        response.put("message", "Hotel removed from wishlist successfully");
+        response.put("status", HttpStatus.OK.value());
+        return ResponseEntity.ok(response);
+    }
+
 }
 

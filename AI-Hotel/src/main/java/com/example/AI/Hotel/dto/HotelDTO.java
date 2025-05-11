@@ -28,4 +28,7 @@ public class HotelDTO {
     private String slug;
     private Double latitude; // Vĩ độ
     private Double longitude; // Kinh độ
+
+    @JsonInclude(JsonInclude.Include.NON_NULL) // xử lý cho api trả về dữ liệu hotel
+    private Double distanceInMeters;
 }

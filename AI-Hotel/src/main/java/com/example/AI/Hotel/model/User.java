@@ -6,6 +6,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -51,6 +52,9 @@ public class User {
     // Trường mới để lưu thời gian hết hạn của OTP
     @Column(name = "reset_token_expiry")
     private LocalDateTime resetTokenExpiry;
+
+    @Column(name = "is_deleted", nullable = false)
+    private boolean isDeleted = false;
 
     public enum Role {
         USER, ADMIN
