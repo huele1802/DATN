@@ -1,5 +1,6 @@
 package com.example.AI.Hotel.controller;
 
+import com.example.AI.Hotel.dto.HotelDTO;
 import com.example.AI.Hotel.dto.HotelSearchResponse;
 import com.example.AI.Hotel.dto.PlaceDTO;
 import com.example.AI.Hotel.dto.RoomDTO;
@@ -7,10 +8,12 @@ import com.example.AI.Hotel.service.HotelDataService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Slf4j
@@ -49,7 +52,37 @@ public class HotelDataController {
             return buildErrorResponse(e);
         }
     }
+    @GetMapping("/hotel/{slug}")
+    public ResponseEntity<Map<String, Object>> getHotelBySlug(@PathVariable String slug) {
+        try {
+            HotelSearchResponse hotel = hotelDataService.findHotelBySlug(slug);
+            return buildDetailResponse(hotel, "hotel", "Không tìm thấy khách sạn với slug: " + slug);
+        } catch (Exception e) {
+            log.error("Error fetching hotel with slug: {}", slug, e);
+            return buildErrorResponse(e);
+        }
+    }
 
+    @GetMapping("/top-5-hotels-by-reviews")
+    public ResponseEntity<Map<String, Object>> getTop5HotelsByReviews() {
+        try {
+            List<HotelSearchResponse> hotels = hotelDataService.getTop5HotelsByReviews();
+            if (hotels.isEmpty()) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("message", "No hotels found with reviews");
+                response.put("status", HttpStatus.NOT_FOUND.value());
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+            }
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Top 5 hotels by reviews retrieved successfully");
+            response.put("status", HttpStatus.OK.value());
+            response.put("data", hotels);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Error fetching top 5 hotels by reviews", e);
+            return buildErrorResponse(e);
+        }
+    }
     @GetMapping("/rooms")
     public ResponseEntity<Map<String, Object>> getAllRooms(
             @RequestParam(defaultValue = "1") int page,
@@ -63,6 +96,7 @@ public class HotelDataController {
             return buildErrorResponse(e);
         }
     }
+
 
     @GetMapping("/rooms/{id}")
     public ResponseEntity<Map<String, Object>> getRoomById(@PathVariable Integer id) {
@@ -96,6 +130,17 @@ public class HotelDataController {
             return buildDetailResponse(place, "place", "Không tìm thấy địa điểm với id: " + id);
         } catch (Exception e) {
             log.error("Error fetching place with id: {}", id, e);
+            return buildErrorResponse(e);
+        }
+    }
+
+    @GetMapping("/place/{slug}")
+    public ResponseEntity<Map<String, Object>> getPlaceBySlug(@PathVariable String slug) {
+        try {
+            PlaceDTO place = hotelDataService.getPlaceBySlug(slug);
+            return buildDetailResponse(place, "place", "Không tìm thấy địa điểm với slug: " + slug);
+        } catch (Exception e) {
+            log.error("Error fetching place with id: {}", slug, e);
             return buildErrorResponse(e);
         }
     }

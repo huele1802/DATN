@@ -48,6 +48,7 @@ public class SecurityConfig {
                         .requestMatchers("/user/**").authenticated()
                         .requestMatchers("/hotels/search").authenticated()
                         .requestMatchers("/hotels/**").permitAll()
+                        .requestMatchers("/places/**").permitAll()
                         .requestMatchers("/getAll/**").permitAll()
                         .anyRequest().authenticated()
                 )

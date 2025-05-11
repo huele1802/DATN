@@ -1,5 +1,6 @@
 package com.example.AI.Hotel.repository;
 
+import com.example.AI.Hotel.model.Hotel;
 import com.example.AI.Hotel.model.Place;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -25,6 +26,8 @@ public interface PlaceRepository extends JpaRepository<Place, Integer> {
             @Param("hotelId") Integer hotelId,
             @Param("maxDistance") double maxDistance,
             @Param("limit") int limit);
+
+    Optional<Place> findBySlug(String slug);
     /*
     @Query(value = "SELECT p.id, p.title, ST_Distance(h.coordinates, p.coordinates) AS distance " +
             "FROM hotels h, places p " +

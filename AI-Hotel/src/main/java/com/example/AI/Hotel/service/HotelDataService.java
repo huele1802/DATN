@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -136,6 +137,25 @@ public class HotelDataService {
     }
 
     @Transactional(readOnly = true)
+    public HotelSearchResponse findHotelBySlug(String slug) {
+        logger.info("Fetching hotel with slug: {}", slug);
+        try {
+            Optional<Hotel> hotelOptional = hotelRepository.findBySlug(slug);
+            if (hotelOptional.isEmpty()) {
+                logger.warn("Hotel not found for slug: {}", slug);
+                throw new RuntimeException("Hotel not found with id: " + slug);
+            }
+
+            Hotel hotel = hotelOptional.get();
+            return mapToHotelSearchResponse(hotel);
+
+        } catch (Exception e) {
+            logger.error("Error fetching hotel with slug: {}", slug, e);
+            throw new RuntimeException("Error fetching hotel: " + e.getMessage(), e);
+        }
+    }
+
+    @Transactional(readOnly = true)
     public RoomDTO getRoomById(Integer id) {
         logger.info("Fetching room with id: {}", id);
         try {
@@ -173,6 +193,53 @@ public class HotelDataService {
         }
     }
 
+    @Transactional(readOnly = true)
+    public PlaceDTO getPlaceBySlug(String slug) {
+        logger.info("Fetching place with slug: {}", slug);
+        try {
+            Optional<Place> placeOpt = placeRepository.findBySlug(slug);
+            if (placeOpt.isEmpty()) {
+                logger.warn("Place not found for slug: {}", slug);
+                throw new RuntimeException("Place not found with id: " + slug);
+            }
+
+            Place place = placeOpt.get();
+            return mapToPlaceDTO(place);
+
+        } catch (Exception e) {
+            logger.error("Error fetching place with slug: {}", slug, e);
+            throw new RuntimeException("Error fetching place: " + e.getMessage(), e);
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public List<HotelSearchResponse> getTop5HotelsByReviews() {
+        logger.info("Fetching top 5 hotels by reviews");
+        try {
+            // Lấy tất cả khách sạn từ repository
+            List<Hotel> allHotels = hotelRepository.findAll();
+            if (allHotels.isEmpty()) {
+                logger.warn("No hotels found in the database");
+                return Collections.emptyList();
+            }
+
+            // Sắp xếp khách sạn theo điểm review trung bình giảm dần và lấy top 5
+            List<HotelSearchResponse> topHotels = allHotels.stream()
+                    .filter(hotel -> hotel.getReviews() != null && !hotel.getReviews().isEmpty()) // Bỏ qua khách sạn không có review
+                    .sorted(Comparator.comparingDouble(hotel ->
+                            -hotel.getReviews().values().stream().mapToDouble(Double::doubleValue).average().orElse(0.0))) // Sắp xếp giảm dần theo điểm trung bình
+                    .limit(5) // Lấy top 5
+                    .map(this::mapToHotelSearchResponse) // Ánh xạ sang HotelSearchResponse
+                    .collect(Collectors.toList());
+
+            logger.info("Successfully fetched top 5 hotels by reviews, count: {}", topHotels.size());
+            return topHotels;
+
+        } catch (Exception e) {
+            logger.error("Error fetching top 5 hotels by reviews", e);
+            throw new RuntimeException("Error fetching top 5 hotels by reviews: " + e.getMessage(), e);
+        }
+    }
     private HotelSearchResponse mapToHotelSearchResponse(Hotel hotel) {
         HotelDTO hotelDTO = new HotelDTO();
         hotelDTO.setId(hotel.getId());
@@ -193,9 +260,9 @@ public class HotelDataService {
 
         HotelSearchResponse response = new HotelSearchResponse();
         response.setHotel(hotelDTO);
-        response.setRooms(Collections.emptyList()); // Để trống vì không lấy rooms ở đây
-        response.setPlaces(Collections.emptyList()); // Để trống vì không lấy places ở đây
         response.setSimilarityScore(null); // Không có similarity score trong trường hợp này
+//        response.setRooms(Collections.emptyList()); // Để trống nếu không lấy rooms
+//        response.setPlaces(Collections.emptyList()); // Để trống nếu không lấy places
         return response;
     }
 

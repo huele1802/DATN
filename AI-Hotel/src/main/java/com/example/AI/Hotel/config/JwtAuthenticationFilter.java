@@ -42,7 +42,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String uri = request.getRequestURI();
         // Bỏ qua các đường dẫn không yêu cầu xác thực
-        boolean isExcluded = uri.startsWith("/auth") || uri.startsWith("/auth/register") ||uri.startsWith("/login/oauth2") || uri.startsWith("/getAll") || uri.startsWith("/hotels") && !uri.equals("/hotels/search");
+        boolean isExcluded = uri.startsWith("/auth") || uri.startsWith("/auth/register") ||uri.startsWith("/login/oauth2") || uri.startsWith("/getAll") || uri.startsWith("/hotels")  && !uri.equals("/hotels/search") || uri.startsWith("/places") || uri.startsWith("/rooms");
         return isExcluded;
     }
 
