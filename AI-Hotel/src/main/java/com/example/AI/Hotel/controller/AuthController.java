@@ -1,11 +1,10 @@
 package com.example.AI.Hotel.controller;
 
 import com.example.AI.Hotel.config.JwtUtil;
-import com.example.AI.Hotel.dto.LoginRequest;
-import com.example.AI.Hotel.dto.LoginResponse;
-import com.example.AI.Hotel.dto.RegisterRequest;
+import com.example.AI.Hotel.dto.*;
 import com.example.AI.Hotel.model.User;
 import com.example.AI.Hotel.repository.UserRepository;
+import com.example.AI.Hotel.service.MailService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -18,8 +17,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/auth")
@@ -36,6 +37,9 @@ public class AuthController {
 
     @Autowired
     private AuthenticationManager authenticationManager;
+
+    @Autowired
+    private MailService mailService;
 
 
 // trả về key-value: message
@@ -64,31 +68,58 @@ public class AuthController {
         return ResponseEntity.ok(response);
     }
 
-//    @PostMapping("/login")
-//    public ResponseEntity<Map<String, Object>> login(@Valid @RequestBody LoginRequest request) {
-//        Map<String, Object> response = new HashMap<>();
-//
-//        try {
-//            Authentication authentication = authenticationManager.authenticate(
-//                    new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
-//
-//            String email = authentication.getName();
-//            User user = userRepository.findByEmail(email)
-//                    .orElseThrow(() -> new IllegalStateException("User not found"));
-//
-//            String token = jwtUtil.generateToken(email, user.getRole().name());
-//
-//            response.put("status", HttpStatus.OK.value());
-//            response.put("message", "Login successful");
-//            response.put("token", token);
-//            return ResponseEntity.ok(response);
-//
-//        } catch (Exception ex) {
-//            response.put("status", HttpStatus.UNAUTHORIZED.value());
-//            response.put("message", "Invalid email or password");
-//            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
-//        }
-//    }
+    @PostMapping("/forgot-password")
+    public ResponseEntity<Map<String, Object>> forgotPassword(@RequestBody ForgotPasswordRequest request) {
+        Map<String, Object> response = new HashMap<>();
+
+        Optional<User> userOptional = userRepository.findByEmail(request.getEmail());
+        if (userOptional.isEmpty()) {
+            response.put("message", "Email not found");
+            response.put("status", HttpStatus.NOT_FOUND.value());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        }
+
+        User user = userOptional.get();
+
+        // Sinh và gửi mã OTP
+        String otp = mailService.sendOtp(user.getEmail());
+        user.setResetToken(otp); // Lưu OTP vào resetToken
+        user.setResetTokenExpiry(LocalDateTime.now().plusMinutes(10)); // OTP hết hạn sau 10 phút
+        userRepository.save(user);
+
+        response.put("message", "OTP has been sent to your email");
+        response.put("status", HttpStatus.OK.value());
+        return ResponseEntity.ok(response);
+    }
+
+    // sau khi có otp
+    @PostMapping("/reset-password")
+    public ResponseEntity<Map<String, Object>> resetPassword(@RequestBody ResetPasswordRequest request) {
+        Map<String, Object> response = new HashMap<>();
+
+        Optional<User> userOptional = userRepository.findByResetToken(request.getToken());
+        if (userOptional.isEmpty()) {
+            response.put("message", "Invalid or expired OTP");
+            response.put("status", HttpStatus.BAD_REQUEST.value());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
+
+        User user = userOptional.get();
+        if (user.getResetTokenExpiry().isBefore(LocalDateTime.now())) {
+            response.put("message", "OTP has expired");
+            response.put("status", HttpStatus.BAD_REQUEST.value());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        user.setResetToken(null);
+        user.setResetTokenExpiry(null);
+        userRepository.save(user);
+
+        response.put("message", "Password reset successfully");
+        response.put("status", HttpStatus.OK.value());
+        return ResponseEntity.ok(response);
+    }
     @PostMapping("/login")
     public ResponseEntity<Map<String, Object>> login(@Valid @RequestBody LoginRequest request) {
         Map<String, Object> response = new HashMap<>();

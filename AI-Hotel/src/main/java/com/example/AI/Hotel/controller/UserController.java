@@ -46,8 +46,8 @@ public class UserController {
     @Autowired
     private Cloudinary cloudinary;
 
-    @Autowired
-    private MailService mailService;
+//    @Autowired
+//    private MailService mailService;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -180,57 +180,58 @@ public class UserController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
-    @PostMapping("/forgot-password")
-    public ResponseEntity<Map<String, Object>> forgotPassword(@RequestBody ForgotPasswordRequest request) {
-        Map<String, Object> response = new HashMap<>();
-
-        Optional<User> userOptional = userRepository.findByEmail(request.getEmail());
-        if (userOptional.isEmpty()) {
-            response.put("message", "Email not found");
-            response.put("status", HttpStatus.NOT_FOUND.value());
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
-        }
-
-        User user = userOptional.get();
-
-        // Sinh và gửi mã OTP
-        String otp = mailService.sendOtp(user.getEmail());
-        user.setResetToken(otp); // Lưu OTP vào resetToken
-        user.setResetTokenExpiry(LocalDateTime.now().plusMinutes(10)); // OTP hết hạn sau 10 phút
-        userRepository.save(user);
-
-        response.put("message", "OTP has been sent to your email");
-        response.put("status", HttpStatus.OK.value());
-        return ResponseEntity.ok(response);
-    }
-
-    @PostMapping("/reset-password")
-    public ResponseEntity<Map<String, Object>> resetPassword(@RequestBody ResetPasswordRequest request) {
-        Map<String, Object> response = new HashMap<>();
-
-        Optional<User> userOptional = userRepository.findByResetToken(request.getToken());
-        if (userOptional.isEmpty()) {
-            response.put("message", "Invalid or expired OTP");
-            response.put("status", HttpStatus.BAD_REQUEST.value());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-        }
-
-        User user = userOptional.get();
-        if (user.getResetTokenExpiry().isBefore(LocalDateTime.now())) {
-            response.put("message", "OTP has expired");
-            response.put("status", HttpStatus.BAD_REQUEST.value());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-        }
-
-        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
-        user.setResetToken(null);
-        user.setResetTokenExpiry(null);
-        userRepository.save(user);
-
-        response.put("message", "Password reset successfully");
-        response.put("status", HttpStatus.OK.value());
-        return ResponseEntity.ok(response);
-    }
+//    @PostMapping("/forgot-password")
+//    public ResponseEntity<Map<String, Object>> forgotPassword(@RequestBody ForgotPasswordRequest request) {
+//        Map<String, Object> response = new HashMap<>();
+//
+//        Optional<User> userOptional = userRepository.findByEmail(request.getEmail());
+//        if (userOptional.isEmpty()) {
+//            response.put("message", "Email not found");
+//            response.put("status", HttpStatus.NOT_FOUND.value());
+//            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+//        }
+//
+//        User user = userOptional.get();
+//
+//        // Sinh và gửi mã OTP
+//        String otp = mailService.sendOtp(user.getEmail());
+//        user.setResetToken(otp); // Lưu OTP vào resetToken
+//        user.setResetTokenExpiry(LocalDateTime.now().plusMinutes(10)); // OTP hết hạn sau 10 phút
+//        userRepository.save(user);
+//
+//        response.put("message", "OTP has been sent to your email");
+//        response.put("status", HttpStatus.OK.value());
+//        return ResponseEntity.ok(response);
+//    }
+//
+//    // sau khi có otp
+//    @PostMapping("/reset-password")
+//    public ResponseEntity<Map<String, Object>> resetPassword(@RequestBody ResetPasswordRequest request) {
+//        Map<String, Object> response = new HashMap<>();
+//
+//        Optional<User> userOptional = userRepository.findByResetToken(request.getToken());
+//        if (userOptional.isEmpty()) {
+//            response.put("message", "Invalid or expired OTP");
+//            response.put("status", HttpStatus.BAD_REQUEST.value());
+//            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+//        }
+//
+//        User user = userOptional.get();
+//        if (user.getResetTokenExpiry().isBefore(LocalDateTime.now())) {
+//            response.put("message", "OTP has expired");
+//            response.put("status", HttpStatus.BAD_REQUEST.value());
+//            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+//        }
+//
+//        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+//        user.setResetToken(null);
+//        user.setResetTokenExpiry(null);
+//        userRepository.save(user);
+//
+//        response.put("message", "Password reset successfully");
+//        response.put("status", HttpStatus.OK.value());
+//        return ResponseEntity.ok(response);
+//    }
     private String extractPublicId(String url) {
         String[] parts = url.split("/");
         String fileName = parts[parts.length - 1];
@@ -280,14 +281,6 @@ public class UserController {
                 })
                 .toList();
 
-//        PagedResponse<HotelDTO> response = new PagedResponse<>(
-//                hotelDTOs,
-//                wishlistPage.getNumber(),
-//                wishlistPage.getSize(),
-//                wishlistPage.getTotalElements(),
-//                wishlistPage.getTotalPages(),
-//                wishlistPage.isLast()
-//        );
         PagedResponse<HotelDTO> response = new PagedResponse<>(
                 hotelDTOs,
                 page - 1, // Sử dụng page gốc (trừ 1 đã áp dụng ở trên)
