@@ -228,7 +228,7 @@ public class HotelDataService {
                     .filter(hotel -> hotel.getReviews() != null && !hotel.getReviews().isEmpty()) // Bỏ qua khách sạn không có review
                     .sorted(Comparator.comparingDouble(hotel ->
                             -hotel.getReviews().values().stream().mapToDouble(Double::doubleValue).average().orElse(0.0))) // Sắp xếp giảm dần theo điểm trung bình
-                    .limit(5) // Lấy top 5
+                    .limit(10) // Lấy top 5
                     .map(this::mapToHotelSearchResponse) // Ánh xạ sang HotelSearchResponse
                     .collect(Collectors.toList());
 

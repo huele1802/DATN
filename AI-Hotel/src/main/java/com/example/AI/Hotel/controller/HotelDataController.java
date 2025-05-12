@@ -74,12 +74,12 @@ public class HotelDataController {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
             }
             Map<String, Object> response = new HashMap<>();
-            response.put("message", "Top 5 hotels by reviews retrieved successfully");
+            response.put("message", "Top 10 hotels by reviews retrieved successfully");
             response.put("status", HttpStatus.OK.value());
             response.put("data", hotels);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            log.error("Error fetching top 5 hotels by reviews", e);
+            log.error("Error fetching top 10 hotels by reviews", e);
             return buildErrorResponse(e);
         }
     }
