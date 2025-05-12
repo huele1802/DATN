@@ -39,8 +39,7 @@ public class MailService {
         String htmlTemplate = loadAndReplaceTemplate(randomOtp);
 
         CreateEmailOptions params = CreateEmailOptions.builder()
-                .from("onboarding@resend.dev")
-//                .to("anchinhktvn123@gmail.com")
+                .from("hotelProposal <hospital@unime.site>")
                 .to(toEmail)
                 .subject("Thư gửi mã OTP xác thực từ Website")
                 .html(htmlTemplate)

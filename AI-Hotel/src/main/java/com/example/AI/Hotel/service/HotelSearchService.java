@@ -32,7 +32,7 @@ public class HotelSearchService {
     private static final double ROOM_SIMILARITY_THRESHOLD = 0.4;
     private static final int MAX_HOTELS = 50;
     private static final int MAX_ROOMS = 200;
-    private static final String EMBEDDING_API_URL = "http://localhost:8000/embed";
+    private static final String EMBEDDING_API_URL = "https://anchinh-embeddingapi.hf.space/embed";
     private static final double DEFAULT_MAX_DISTANCE_METERS = 5000; // Bán kính mặc định 5km
 
     private final HotelRepository hotelRepository;
