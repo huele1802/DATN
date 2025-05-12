@@ -12,7 +12,10 @@ import com.example.AI.Hotel.repository.SearchHistoryRepository;
 import com.example.AI.Hotel.repository.UserRepository;
 import com.example.AI.Hotel.repository.WishlistRepository;
 import com.example.AI.Hotel.service.MailService;
+import com.example.AI.Hotel.service.UserService;
 import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -37,6 +40,8 @@ import java.util.*;
 @RequestMapping("/user")
 public class UserController {
 
+    private static final Logger logger = LoggerFactory.getLogger(UserController.class);
+
     @Autowired
     private SearchHistoryRepository searchHistoryRepository;
 
@@ -46,16 +51,14 @@ public class UserController {
     @Autowired
     private Cloudinary cloudinary;
 
-//    @Autowired
-//    private MailService mailService;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
     @Autowired
     private WishlistRepository wishlistRepository;
+
     @Autowired
     private HotelRepository hotelRepository;
+
+    @Autowired
+    private UserService userService;
 
     @GetMapping("/search-history")
     public ResponseEntity<List<SearchHistoryDTO>> getSearchHistory() {
@@ -245,6 +248,38 @@ public class UserController {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalStateException("User not found"));
         return ResponseEntity.ok(user);
+    }
+
+    @PutMapping("/update-password")
+    public ResponseEntity<Map<String, Object>> updatePassword(@Valid @RequestBody UpdatePasswordRequest request) {
+        Map<String, Object> response = new HashMap<>();
+
+        try {
+            String email = SecurityContextHolder.getContext().getAuthentication().getName();
+            userService.updatePassword(email, request.getOldPassword(), request.getNewPassword());
+
+            response.put("status", HttpStatus.OK.value());
+            response.put("message", "Password updated successfully");
+            return ResponseEntity.ok(response);
+
+        } catch (IllegalArgumentException e) {
+            logger.warn("Failed to update password for user: {}", e.getMessage());
+            response.put("status", HttpStatus.BAD_REQUEST.value());
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+
+        } catch (SecurityException e) {
+            logger.warn("Unauthorized attempt to update password: {}", e.getMessage());
+            response.put("status", HttpStatus.UNAUTHORIZED.value());
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+
+        } catch (Exception e) {
+            logger.error("Error updating password: {}", e.getMessage());
+            response.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
+            response.put("message", "Server error: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
     }
 
     @GetMapping("/wishlist")

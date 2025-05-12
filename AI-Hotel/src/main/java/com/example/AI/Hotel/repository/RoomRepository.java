@@ -20,11 +20,11 @@ public interface RoomRepository extends JpaRepository<RoomType, Integer> {
     List<RoomType> findByPrice(@Param("maxPrice") Double maxPrice);
 
     // tìm phòng chỉ theo số khách
-    @Query("SELECT r FROM RoomType r WHERE r.numberOfGuests >= :numberOfGuests")
+    @Query("SELECT r FROM RoomType r WHERE r.numberOfGuests <= :numberOfGuests")
     List<RoomType> findByGuests(@Param("numberOfGuests") Integer numberOfGuests);
 
     // truy vấn phòng theo giá và so luong khách
-    @Query("SELECT rt FROM RoomType rt WHERE rt.price <= :maxPrice AND rt.numberOfGuests >= :numberOfGuests")
+    @Query("SELECT rt FROM RoomType rt WHERE rt.price <= :maxPrice AND rt.numberOfGuests <= :numberOfGuests")
     List<RoomType> findByPriceAndGuests(
             @Param("maxPrice") Double maxPrice,
             @Param("numberOfGuests") Integer numberOfGuests);

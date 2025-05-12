@@ -616,11 +616,11 @@ public class HotelSearchService {
             response.setHotel(toHotelDTO(hotel));
 
             // thêm logic trả về room và place nếu cần
-//            List<RoomType> hotelRooms = roomsByHotel.get(hotel.getId());
-//            List<RoomDTO> roomDTOs = hotelRooms.stream()
-//                    .map(this::toRoomDTO)
-//                    .collect(Collectors.toList());
-//            response.setRooms(roomDTOs);
+            List<RoomType> hotelRooms = roomsByHotel.get(hotel.getId());
+            List<RoomDTO> roomDTOs = hotelRooms.stream()
+                    .map(this::toRoomDTO)
+                    .collect(Collectors.toList());
+            response.setRooms(roomDTOs);
 //            response.setPlaces(List.of());
 
             responses.add(response);
@@ -717,7 +717,7 @@ public class HotelSearchService {
         HotelDTO hotelDTO = new HotelDTO();
         hotelDTO.setId(hotel.getId());
         hotelDTO.setName(hotel.getName());
-//        hotelDTO.setAddress(hotel.getAddress());
+        hotelDTO.setAddress(hotel.getAddress());
         hotelDTO.setDistrict(hotel.getDistrict());
         hotelDTO.setDescription(hotel.getDescription());
         hotelDTO.setHotelLink(hotel.getHotelLink());
