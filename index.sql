@@ -11,9 +11,8 @@ SET maintenance_work_mem = '64MB';
 CREATE INDEX idx_hotel_embeddings_embedding ON hotel_embeddings USING ivfflat (embedding vector_cosine_ops);
 CREATE INDEX idx_place_embeddings_embedding ON place_embeddings USING ivfflat (embedding vector_cosine_ops);
 
-
-
-
+CREATE INDEX idx_user_place ON place_trip (user_id, place_id);
+CREATE INDEX idx_user_hotel ON hotel_trip (user_id, hotel_id);
 
 CREATE INDEX idx_hotels_coordinates ON hotels USING GIST (coordinates);
 CREATE INDEX idx_places_coordinates ON places USING GIST (coordinates);

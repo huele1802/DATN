@@ -3,15 +3,10 @@ package com.example.AI.Hotel.controller;
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
 import com.example.AI.Hotel.dto.*;
-import com.example.AI.Hotel.model.Hotel;
-import com.example.AI.Hotel.model.SearchHistory;
-import com.example.AI.Hotel.model.User;
-import com.example.AI.Hotel.model.Wishlist;
-import com.example.AI.Hotel.repository.HotelRepository;
-import com.example.AI.Hotel.repository.SearchHistoryRepository;
-import com.example.AI.Hotel.repository.UserRepository;
-import com.example.AI.Hotel.repository.WishlistRepository;
+import com.example.AI.Hotel.model.*;
+import com.example.AI.Hotel.repository.*;
 import com.example.AI.Hotel.service.MailService;
+import com.example.AI.Hotel.service.TripService;
 import com.example.AI.Hotel.service.UserService;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
@@ -41,6 +36,7 @@ import java.util.*;
 public class UserController {
 
     private static final Logger logger = LoggerFactory.getLogger(UserController.class);
+    private final TripService tripService;
 
     @Autowired
     private SearchHistoryRepository searchHistoryRepository;
@@ -57,8 +53,21 @@ public class UserController {
     @Autowired
     private HotelRepository hotelRepository;
 
+    private final UserService userService;
+    private final PlaceTripRepository placeTripRepository;
+    private final HotelTripRepository hotelTripRepository;
+
     @Autowired
-    private UserService userService;
+    public UserController(TripService tripService,
+                          UserService userService,
+                          PlaceTripRepository placeTripRepository,
+                          HotelTripRepository hotelTripRepository) {
+        this.tripService = tripService;
+        this.userService = userService;
+        this.placeTripRepository = placeTripRepository;
+        this.hotelTripRepository = hotelTripRepository;
+    }
+
 
     @GetMapping("/search-history")
     public ResponseEntity<List<SearchHistoryDTO>> getSearchHistory() {
@@ -78,6 +87,112 @@ public class UserController {
         return ResponseEntity.ok(historyDTOs);
     }
 
+//    @PutMapping(value = "/profile", consumes = "multipart/form-data")
+//    public ResponseEntity<Map<String, Object>> updateProfile(
+//            @RequestParam(value = "fullName", required = false) String fullName,
+//            @RequestParam(value = "phoneNumber", required = false) String phoneNumber,
+//            @RequestParam(value = "dateOfBirth", required = false) String dateOfBirth,
+//            @RequestParam(value = "address", required = false) String address,
+//            @RequestParam(value = "avatar", required = false) MultipartFile avatar) {
+//        Map<String, Object> response = new HashMap<>();
+//
+//        try {
+//            String email = SecurityContextHolder.getContext().getAuthentication().getName();
+//            User user = userRepository.findByEmail(email)
+//                    .orElseThrow(() -> new IllegalStateException("User not found"));
+//
+//            // Cập nhật thông tin hồ sơ
+//            if (fullName != null && !fullName.isEmpty()) {
+//                if (fullName.length() < 2 || fullName.length() > 100) {
+//                    response.put("message", "INVALID_FULLNAME_FORMAT: Full name must be between 2 and 100 characters");
+//                    response.put("status", 400);
+//                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+//                }
+//                user.setFullName(fullName);
+//            }
+//            if (phoneNumber != null && !phoneNumber.isEmpty()) {
+//                if (phoneNumber.length() < 10 || phoneNumber.length() > 15) {
+//                    response.put("message", "INVALID_PHONE_FORMAT: Phone number must be between 10 and 15 characters");
+//                    response.put("status", 400);
+//                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+//                }
+//                user.setPhoneNumber(phoneNumber);
+//            }
+//            if (dateOfBirth != null && !dateOfBirth.isEmpty()) {
+//                try {
+//                    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
+//                    LocalDate parsedDate = LocalDate.parse(dateOfBirth, formatter);
+//                    user.setDateOfBirth(parsedDate);
+//                } catch (DateTimeParseException e) {
+//                    response.put("message", "INVALID_DATE_FORMAT: Date of birth must be in format yyyy-MM-dd");
+//                    response.put("status", 400);
+//                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+//                }
+//            }
+//            if (address != null && !address.isEmpty()) {
+//                if (address.length() > 255) {
+//                    response.put("message", "INVALID_ADDRESS_FORMAT: Address must not exceed 255 characters");
+//                    response.put("status", 400);
+//                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+//                }
+//                user.setAddress(address);
+//            }
+//
+//            // Xử lý file avatar nếu có
+//            if (avatar != null && !avatar.isEmpty()) {
+//                // Kiểm tra định dạng file
+//                String contentType = avatar.getContentType();
+//                if (contentType == null || !(contentType.equals("image/jpeg") || contentType.equals("image/png") || contentType.equals("image/jpg"))) {
+//                    response.put("message", "Only image files (jpg, png, jpeg) are allowed");
+//                    response.put("status", 400);
+//                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+//                }
+//
+//                // Kiểm tra kích thước file
+//                if (avatar.getSize() > 10 * 1024 * 1024) { // Giới hạn 10MB
+//                    response.put("message", "File size must be less than 10MB");
+//                    response.put("status", 400);
+//                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+//                }
+//
+//                // Upload lên Cloudinary
+//                Map uploadResult = cloudinary.uploader().upload(avatar.getBytes(), ObjectUtils.asMap(
+//                        "resource_type", "image",
+//                        "public_id", email + "_" + System.currentTimeMillis()
+//                ));
+//                String newAvatarUrl = (String) uploadResult.get("secure_url");
+//
+//                // Xóa avatar cũ trên Cloudinary nếu có (trừ avatar mặc định)
+//                if (user.getAvatarUrl() != null && !user.getAvatarUrl().contains("default-avatar")) {
+//                    String oldPublicId = extractPublicId(user.getAvatarUrl());
+//                    cloudinary.uploader().destroy(oldPublicId, ObjectUtils.emptyMap());
+//                }
+//
+//                // Cập nhật URL mới
+//                user.setAvatarUrl(newAvatarUrl);
+//            }
+//
+//            userRepository.save(user);
+//
+//            response.put("message", "User updated successfully");
+//            response.put("status", 200);
+//            response.put("avatarUrl", user.getAvatarUrl());
+//            return ResponseEntity.ok(response);
+//        } catch (IllegalStateException e) {
+//            response.put("message", "User not found");
+//            response.put("status", 404);
+//            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+//        } catch (IOException e) {
+//            response.put("message", "Failed to upload avatar: " + e.getMessage());
+//            response.put("status", 500);
+//            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+//        } catch (Exception e) {
+//            response.put("message", "Failed to update user: " + e.getMessage());
+//            response.put("status", 500);
+//            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+//        }
+//    }
+
     @PutMapping(value = "/profile", consumes = "multipart/form-data")
     public ResponseEntity<Map<String, Object>> updateProfile(
             @RequestParam(value = "fullName", required = false) String fullName,
@@ -86,9 +201,11 @@ public class UserController {
             @RequestParam(value = "address", required = false) String address,
             @RequestParam(value = "avatar", required = false) MultipartFile avatar) {
         Map<String, Object> response = new HashMap<>();
+        Logger logger = LoggerFactory.getLogger(UserController.class);
 
         try {
             String email = SecurityContextHolder.getContext().getAuthentication().getName();
+            logger.info("Updating profile for email: {}", email);
             User user = userRepository.findByEmail(email)
                     .orElseThrow(() -> new IllegalStateException("User not found"));
 
@@ -100,6 +217,7 @@ public class UserController {
                     return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
                 }
                 user.setFullName(fullName);
+                logger.info("Updated fullName to: {}", fullName);
             }
             if (phoneNumber != null && !phoneNumber.isEmpty()) {
                 if (phoneNumber.length() < 10 || phoneNumber.length() > 15) {
@@ -108,14 +226,16 @@ public class UserController {
                     return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
                 }
                 user.setPhoneNumber(phoneNumber);
+                logger.info("Updated phoneNumber to: {}", phoneNumber);
             }
             if (dateOfBirth != null && !dateOfBirth.isEmpty()) {
                 try {
                     DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
                     LocalDate parsedDate = LocalDate.parse(dateOfBirth, formatter);
                     user.setDateOfBirth(parsedDate);
+                    logger.info("Updated dateOfBirth to: {}", dateOfBirth);
                 } catch (DateTimeParseException e) {
-                    response.put("message", "INVALID_DATE_FORMAT: Date of birth must be in format yyyy-MM-dd");
+                    response.put("message", "INVALID_DATE_FORMAT: Date of birth must be in format dd-MM-yyyy");
                     response.put("status", 400);
                     return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
                 }
@@ -127,10 +247,12 @@ public class UserController {
                     return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
                 }
                 user.setAddress(address);
+                logger.info("Updated address to: {}", address);
             }
 
             // Xử lý file avatar nếu có
             if (avatar != null && !avatar.isEmpty()) {
+                logger.info("Processing avatar upload for user: {}, file size: {}", email, avatar.getSize());
                 // Kiểm tra định dạng file
                 String contentType = avatar.getContentType();
                 if (contentType == null || !(contentType.equals("image/jpeg") || contentType.equals("image/png") || contentType.equals("image/jpg"))) {
@@ -152,18 +274,26 @@ public class UserController {
                         "public_id", email + "_" + System.currentTimeMillis()
                 ));
                 String newAvatarUrl = (String) uploadResult.get("secure_url");
+                logger.info("Cloudinary upload result: {}", uploadResult);
+
+                if (newAvatarUrl == null) {
+                    throw new IOException("Failed to get secure_url from Cloudinary upload");
+                }
 
                 // Xóa avatar cũ trên Cloudinary nếu có (trừ avatar mặc định)
                 if (user.getAvatarUrl() != null && !user.getAvatarUrl().contains("default-avatar")) {
                     String oldPublicId = extractPublicId(user.getAvatarUrl());
                     cloudinary.uploader().destroy(oldPublicId, ObjectUtils.emptyMap());
+                    logger.info("Deleted old avatar with publicId: {}", oldPublicId);
                 }
 
                 // Cập nhật URL mới
                 user.setAvatarUrl(newAvatarUrl);
+                logger.info("Updated avatarUrl to: {}", newAvatarUrl);
             }
 
             userRepository.save(user);
+            logger.info("User profile saved successfully for email: {}", email);
 
             response.put("message", "User updated successfully");
             response.put("status", 200);
@@ -174,67 +304,156 @@ public class UserController {
             response.put("status", 404);
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
         } catch (IOException e) {
+            logger.error("IOException during avatar upload: {}", e.getMessage());
             response.put("message", "Failed to upload avatar: " + e.getMessage());
             response.put("status", 500);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         } catch (Exception e) {
+            logger.error("Unexpected error updating user: {}", e.getMessage(), e);
             response.put("message", "Failed to update user: " + e.getMessage());
             response.put("status", 500);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
-//    @PostMapping("/forgot-password")
-//    public ResponseEntity<Map<String, Object>> forgotPassword(@RequestBody ForgotPasswordRequest request) {
-//        Map<String, Object> response = new HashMap<>();
-//
-//        Optional<User> userOptional = userRepository.findByEmail(request.getEmail());
-//        if (userOptional.isEmpty()) {
-//            response.put("message", "Email not found");
-//            response.put("status", HttpStatus.NOT_FOUND.value());
-//            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
-//        }
-//
-//        User user = userOptional.get();
-//
-//        // Sinh và gửi mã OTP
-//        String otp = mailService.sendOtp(user.getEmail());
-//        user.setResetToken(otp); // Lưu OTP vào resetToken
-//        user.setResetTokenExpiry(LocalDateTime.now().plusMinutes(10)); // OTP hết hạn sau 10 phút
-//        userRepository.save(user);
-//
-//        response.put("message", "OTP has been sent to your email");
-//        response.put("status", HttpStatus.OK.value());
-//        return ResponseEntity.ok(response);
-//    }
-//
-//    // sau khi có otp
-//    @PostMapping("/reset-password")
-//    public ResponseEntity<Map<String, Object>> resetPassword(@RequestBody ResetPasswordRequest request) {
-//        Map<String, Object> response = new HashMap<>();
-//
-//        Optional<User> userOptional = userRepository.findByResetToken(request.getToken());
-//        if (userOptional.isEmpty()) {
-//            response.put("message", "Invalid or expired OTP");
-//            response.put("status", HttpStatus.BAD_REQUEST.value());
-//            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-//        }
-//
-//        User user = userOptional.get();
-//        if (user.getResetTokenExpiry().isBefore(LocalDateTime.now())) {
-//            response.put("message", "OTP has expired");
-//            response.put("status", HttpStatus.BAD_REQUEST.value());
-//            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-//        }
-//
-//        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
-//        user.setResetToken(null);
-//        user.setResetTokenExpiry(null);
-//        userRepository.save(user);
-//
-//        response.put("message", "Password reset successfully");
-//        response.put("status", HttpStatus.OK.value());
-//        return ResponseEntity.ok(response);
-//    }
+
+    @PostMapping("/place-trip/add")
+    public ResponseEntity<Map<String, Object>> addPlaceTrip(@Valid @RequestBody AddPlaceTripRequest request) {
+        Map<String, Object> response = new HashMap<>();
+
+        try {
+            // Lấy userId từ token
+            String email = SecurityContextHolder.getContext().getAuthentication().getName();
+            User user = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+            // Kiểm tra trùng lặp trước khi thêm
+            if (placeTripRepository.findByUserIdAndPlaceId(user.getId(), request.getPlaceId()).isPresent()) {
+                logger.warn("User {} attempted to add duplicate place {} to trip", user.getId(), request.getPlaceId());
+                response.put("status", HttpStatus.BAD_REQUEST.value());
+                response.put("message", "Place already added to trip");
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+            }
+
+            PlaceTrip placeTrip = tripService.addPlaceTrip(user.getId(), request.getPlaceId());
+
+            response.put("status", HttpStatus.OK.value());
+            response.put("message", "Place added to trip successfully");
+            response.put("placeTrip", placeTrip);
+            return ResponseEntity.ok(response);
+
+        } catch (IllegalArgumentException e) {
+            logger.warn("Failed to add place to trip: {}", e.getMessage());
+            response.put("status", HttpStatus.BAD_REQUEST.value());
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+
+        } catch (Exception e) {
+            logger.error("Error adding place to trip: {}", e.getMessage());
+            response.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
+            response.put("message", "Server error: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    @DeleteMapping("/place-trip/delete/{id}")
+    public ResponseEntity<Map<String, Object>> deletePlaceTrip(@PathVariable Integer id) { // Thay Long bằng Integer
+        Map<String, Object> response = new HashMap<>();
+
+        try {
+            // Lấy userId từ token
+            String email = SecurityContextHolder.getContext().getAuthentication().getName();
+            User user = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+            tripService.deletePlaceTrip(user.getId(), id);
+
+            response.put("status", HttpStatus.OK.value());
+            response.put("message", "Place removed from trip successfully");
+            return ResponseEntity.ok(response);
+
+        } catch (IllegalArgumentException e) {
+            logger.warn("Failed to delete place trip: {}", e.getMessage());
+            response.put("status", HttpStatus.BAD_REQUEST.value());
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+
+        } catch (Exception e) {
+            logger.error("Error deleting place trip: {}", e.getMessage());
+            response.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
+            response.put("message", "Server error: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    @PostMapping("/hotel-trip/add")
+    public ResponseEntity<Map<String, Object>> addHotelTrip(@Valid @RequestBody AddHotelTripRequest request) {
+        Map<String, Object> response = new HashMap<>();
+
+        try {
+            // Lấy userId từ token
+            String email = SecurityContextHolder.getContext().getAuthentication().getName();
+            User user = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+            // Kiểm tra trùng lặp trước khi thêm
+            if (hotelTripRepository.findByUserIdAndHotelId(user.getId(), request.getHotelId()).isPresent()) {
+                logger.warn("User {} attempted to add duplicate hotel {} to trip", user.getId(), request.getHotelId());
+                response.put("status", HttpStatus.BAD_REQUEST.value());
+                response.put("message", "Hotel already added to trip");
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+            }
+
+            HotelTrip hotelTrip = tripService.addHotelTrip(user.getId(), request.getHotelId());
+
+            response.put("status", HttpStatus.OK.value());
+            response.put("message", "Hotel added to trip successfully");
+            response.put("hotelTrip", hotelTrip);
+            return ResponseEntity.ok(response);
+
+        } catch (IllegalArgumentException e) {
+            logger.warn("Failed to add hotel to trip: {}", e.getMessage());
+            response.put("status", HttpStatus.BAD_REQUEST.value());
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+
+        } catch (Exception e) {
+            logger.error("Error adding hotel to trip: {}", e.getMessage());
+            response.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
+            response.put("message", "Server error: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    @DeleteMapping("/hotel-trip/delete/{id}")
+    public ResponseEntity<Map<String, Object>> deleteHotelTrip(@PathVariable Integer id) {
+        Map<String, Object> response = new HashMap<>();
+
+        try {
+            // Lấy userId từ token
+            String email = SecurityContextHolder.getContext().getAuthentication().getName();
+            User user = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+            tripService.deleteHotelTrip(user.getId(), id);
+
+            response.put("status", HttpStatus.OK.value());
+            response.put("message", "Hotel removed from trip successfully");
+            return ResponseEntity.ok(response);
+
+        } catch (IllegalArgumentException e) {
+            logger.warn("Failed to delete hotel trip: {}", e.getMessage());
+            response.put("status", HttpStatus.BAD_REQUEST.value());
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+
+        } catch (Exception e) {
+            logger.error("Error deleting hotel trip: {}", e.getMessage());
+            response.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
+            response.put("message", "Server error: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
     private String extractPublicId(String url) {
         String[] parts = url.split("/");
         String fileName = parts[parts.length - 1];

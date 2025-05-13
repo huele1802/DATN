@@ -94,3 +94,20 @@ CREATE TABLE wishlist (
     CONSTRAINT fk_hotel FOREIGN KEY (hotel_id) REFERENCES hotels(id) ON DELETE CASCADE,
     CONSTRAINT unique_user_hotel UNIQUE (user_id, hotel_id)
 );
+CREATE TABLE place_trip (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    place_id INTEGER NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (place_id) REFERENCES places(id) ON DELETE CASCADE,
+    UNIQUE (user_id, place_id)
+);
+
+CREATE TABLE hotel_trip (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    hotel_id INTEGER NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (hotel_id) REFERENCES hotels(id) ON DELETE CASCADE,
+    UNIQUE (user_id, hotel_id)
+);
