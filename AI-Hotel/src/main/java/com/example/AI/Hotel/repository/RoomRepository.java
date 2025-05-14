@@ -36,6 +36,9 @@ public interface RoomRepository extends JpaRepository<RoomType, Integer> {
     @Query("SELECT rt.hotel.id FROM RoomType rt WHERE rt.id IN :roomIds")
     List<Integer> findHotelIdsByRoomIds(@Param("roomIds") List<Integer> roomIds);
 
+    @Query(value = "SELECT * FROM room_types WHERE hotel_id IN :hotelIds", nativeQuery = true)
+    List<RoomType> findByHotelIds(@Param("hotelIds") List<Integer> hotelIds);
+
     //CAST(:queryEmbedding AS vector) để chuyển queryEmbedding từ kiểu character varying (chuỗi) thành kiểu vector
     @Query(value = """
         SELECT 

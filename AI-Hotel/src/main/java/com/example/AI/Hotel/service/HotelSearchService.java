@@ -30,7 +30,7 @@ public class HotelSearchService {
 
     private static final double SIMILARITY_THRESHOLD = 0.68;
     private static final double ROOM_SIMILARITY_THRESHOLD = 0.4;
-    private static final int MAX_HOTELS = 50;
+    private static final int MAX_HOTELS = 80;
     private static final int MAX_ROOMS = 200;
     private static final String EMBEDDING_API_URL = "https://anchinh-embeddingapi.hf.space/embed";
     private static final double DEFAULT_MAX_DISTANCE_METERS = 5000; // Bán kính mặc định 5km
@@ -99,119 +99,193 @@ public class HotelSearchService {
         }
     }
 
-    private List<HotelSearchResponse> findMatchingHotels(float[] queryEmbedding) {
-        List<HotelSearchResponse> responses = new ArrayList<>();
+//    private List<HotelSearchResponse> findMatchingHotels(float[] queryEmbedding) {
+//        List<HotelSearchResponse> responses = new ArrayList<>();
+//
+//        String queryEmbeddingStr = arrayToString(queryEmbedding); // chuyển query dạng float[] sang String
+//
+//        // Bước 1: Tìm các khách sạn phù hợp dựa trên hotel_embeddings
+//        List<Object[]> similarHotels = hotelRepository.findTopSimilarHotels(
+//                queryEmbeddingStr, SIMILARITY_THRESHOLD, MAX_HOTELS);
+//        logger.info("Hotels above threshold ({}): {}", SIMILARITY_THRESHOLD, similarHotels.size());
+//
+//        if (similarHotels.isEmpty()) {
+//            logger.warn("No hotels found above similarity threshold {}. Checking all hotels for debug...", SIMILARITY_THRESHOLD);
+//            List<Object[]> allHotels = hotelRepository.findTopSimilarHotels(queryEmbeddingStr, 0.0, 10);
+//            for (Object[] result : allHotels) {
+//                Integer hotelId = (Integer) result[0];
+//                double similarity = (Double) result[2];
+//                logger.debug("Debug - Hotel ID: {}, Similarity: {}", hotelId, similarity);
+//            }
+//            return responses;
+//        }
+//
+//        List<Integer> hotelIds = similarHotels.stream()
+//                .map(result -> (Integer) result[0])
+//                .toList();
+//
+//        // Bước 2: Tìm các phòng phù hợp dựa trên room_embeddings
+//        List<Object[]> similarRooms = roomRepository.findTopSimilarRooms(
+//                queryEmbeddingStr, ROOM_SIMILARITY_THRESHOLD, MAX_ROOMS);
+//        logger.info("Rooms above threshold ({}): {}", ROOM_SIMILARITY_THRESHOLD, similarRooms.size());
+//
+//        if (similarRooms.isEmpty()) {
+//            logger.warn("No rooms found above similarity threshold {}. Checking all rooms for debug...", ROOM_SIMILARITY_THRESHOLD);
+//            List<Object[]> allRooms = roomRepository.findTopSimilarRooms(queryEmbeddingStr, 0.0, 10);
+//            for (Object[] result : allRooms) {
+//                Integer roomId = (Integer) result[0];
+//                double similarity = (Double) result[2];
+//                logger.debug("Debug - Room ID: {}, Similarity: {}", roomId, similarity);
+//            }
+//            return responses; // Không có phòng phù hợp, trả về danh sách rỗng
+//        }
+//
+//        // Lấy danh sách ID phòng và khách sạn tương ứng
+//        List<Integer> roomIds = similarRooms.stream()
+//                .map(result -> (Integer) result[0])
+//                .collect(Collectors.toList());
+//
+//        List<Integer> roomHotelIds = roomRepository.findHotelIdsByRoomIds(roomIds);
+//        List<Integer> filteredHotelIds = hotelIds.stream()
+//                .filter(hotelId -> roomHotelIds.contains(hotelId))
+//                .collect(Collectors.toList());
+//
+//        if (filteredHotelIds.isEmpty()) {
+//            logger.info("No hotels have rooms matching the room similarity threshold.");
+//            return responses;
+//        }
+//
+//        // Lấy thông tin khách sạn và phòng
+//        List<Hotel> hotels = hotelRepository.findAllById(filteredHotelIds);
+//        List<RoomType> relevantRoomTypes = roomRepository.findByIdIn(roomIds);
+//
+//        // Bước 3: Xây dựng kết quả
+//        for (Object[] hotelResult : similarHotels) {
+//            Integer hotelId = (Integer) hotelResult[0];
+//            if (!filteredHotelIds.contains(hotelId)) {
+//                continue; // Bỏ qua khách sạn không có phòng phù hợp
+//            }
+//
+//            double hotelSimilarity = (Double) hotelResult[2];
+//            logger.debug("Processing Hotel ID: {}, Similarity: {}", hotelId, hotelSimilarity);
+//
+//            Optional<Hotel> hotelOpt = hotels.stream().filter(h -> h.getId().equals(hotelId)).findFirst();
+//            if (hotelOpt.isEmpty()) {
+//                logger.warn("Hotel not found for ID: {}", hotelId);
+//                continue;
+//            }
+//            Hotel hotel = hotelOpt.get();
+//
+//            // Lấy các phòng phù hợp với khách sạn này
+//            List<RoomType> hotelRooms = relevantRoomTypes.stream()
+//                    .filter(rt -> rt.getHotel().getId().equals(hotelId))
+//                    .toList();
+//
+//            if (hotelRooms.isEmpty()) {
+//                logger.debug("No matching rooms for Hotel ID: {}", hotelId);
+//                continue; // Bỏ qua khách sạn không có phòng phù hợp
+//            }
+//
+//            HotelSearchResponse response = new HotelSearchResponse();
+//            response.setHotel(toHotelDTO(hotel));
+//            response.setSimilarityScore(hotelSimilarity);
+//
+//            // Thêm thông tin phòng và similarity score của từng phòng
+//            List<RoomDTO> rooms = new ArrayList<>();
+//            for (RoomType room : hotelRooms) {
+//                RoomDTO roomDTO = toRoomDTO(room);
+//                // Tìm similarity score của phòng
+//                Optional<Object[]> roomResultOpt = similarRooms.stream()
+//                        .filter(r -> ((Integer) r[0]).equals(room.getId()))
+//                        .findFirst();
+//                if (roomResultOpt.isPresent()) {
+//                    double roomSimilarity = (Double) roomResultOpt.get()[2];
+//                    roomDTO.setSimilarityScore(roomSimilarity); // Giả sử RoomDTO có trường similarityScore
+//                }
+//                rooms.add(roomDTO);
+//            }
+//            response.setRooms(rooms);
+//
+//            responses.add(response);
+//        }
+//
+//        return responses;
+//    }
 
-        String queryEmbeddingStr = arrayToString(queryEmbedding); // chuyển query dạng float[] sang String
+    // OLD
+private List<HotelSearchResponse> findMatchingHotels(float[] queryEmbedding) {
+    List<HotelSearchResponse> responses = new ArrayList<>();
 
-        // Bước 1: Tìm các khách sạn phù hợp dựa trên hotel_embeddings
-        List<Object[]> similarHotels = hotelRepository.findTopSimilarHotels(
-                queryEmbeddingStr, SIMILARITY_THRESHOLD, MAX_HOTELS);
-        logger.info("Hotels above threshold ({}): {}", SIMILARITY_THRESHOLD, similarHotels.size());
+    String queryEmbeddingStr = arrayToString(queryEmbedding); // Chuyển query dạng float[] sang String
 
-        if (similarHotels.isEmpty()) {
-            logger.warn("No hotels found above similarity threshold {}. Checking all hotels for debug...", SIMILARITY_THRESHOLD);
-            List<Object[]> allHotels = hotelRepository.findTopSimilarHotels(queryEmbeddingStr, 0.0, 10);
-            for (Object[] result : allHotels) {
-                Integer hotelId = (Integer) result[0];
-                double similarity = (Double) result[2];
-                logger.debug("Debug - Hotel ID: {}, Similarity: {}", hotelId, similarity);
-            }
-            return responses;
+    // Bước 1: Tìm các khách sạn phù hợp dựa trên hotel_embeddings
+    List<Object[]> similarHotels = hotelRepository.findTopSimilarHotels(
+            queryEmbeddingStr, SIMILARITY_THRESHOLD, MAX_HOTELS);
+    logger.info("Hotels above threshold ({}): {}", SIMILARITY_THRESHOLD, similarHotels.size());
+
+    if (similarHotels.isEmpty()) {
+        logger.warn("No hotels found above similarity threshold {}. Checking all hotels for debug...", SIMILARITY_THRESHOLD);
+        List<Object[]> allHotels = hotelRepository.findTopSimilarHotels(queryEmbeddingStr, 0.0, 10);
+        for (Object[] result : allHotels) {
+            Integer hotelId = (Integer) result[0];
+            double similarity = (Double) result[2];
+            logger.debug("Debug - Hotel ID: {}, Similarity: {}", hotelId, similarity);
         }
-
-        List<Integer> hotelIds = similarHotels.stream()
-                .map(result -> (Integer) result[0])
-                .toList();
-
-        // Bước 2: Tìm các phòng phù hợp dựa trên room_embeddings
-        List<Object[]> similarRooms = roomRepository.findTopSimilarRooms(
-                queryEmbeddingStr, ROOM_SIMILARITY_THRESHOLD, MAX_ROOMS);
-        logger.info("Rooms above threshold ({}): {}", ROOM_SIMILARITY_THRESHOLD, similarRooms.size());
-
-        if (similarRooms.isEmpty()) {
-            logger.warn("No rooms found above similarity threshold {}. Checking all rooms for debug...", ROOM_SIMILARITY_THRESHOLD);
-            List<Object[]> allRooms = roomRepository.findTopSimilarRooms(queryEmbeddingStr, 0.0, 10);
-            for (Object[] result : allRooms) {
-                Integer roomId = (Integer) result[0];
-                double similarity = (Double) result[2];
-                logger.debug("Debug - Room ID: {}, Similarity: {}", roomId, similarity);
-            }
-            return responses; // Không có phòng phù hợp, trả về danh sách rỗng
-        }
-
-        // Lấy danh sách ID phòng và khách sạn tương ứng
-        List<Integer> roomIds = similarRooms.stream()
-                .map(result -> (Integer) result[0])
-                .collect(Collectors.toList());
-
-        List<Integer> roomHotelIds = roomRepository.findHotelIdsByRoomIds(roomIds);
-        List<Integer> filteredHotelIds = hotelIds.stream()
-                .filter(hotelId -> roomHotelIds.contains(hotelId))
-                .collect(Collectors.toList());
-
-        if (filteredHotelIds.isEmpty()) {
-            logger.info("No hotels have rooms matching the room similarity threshold.");
-            return responses;
-        }
-
-        // Lấy thông tin khách sạn và phòng
-        List<Hotel> hotels = hotelRepository.findAllById(filteredHotelIds);
-        List<RoomType> relevantRoomTypes = roomRepository.findByIdIn(roomIds);
-
-        // Bước 3: Xây dựng kết quả
-        for (Object[] hotelResult : similarHotels) {
-            Integer hotelId = (Integer) hotelResult[0];
-            if (!filteredHotelIds.contains(hotelId)) {
-                continue; // Bỏ qua khách sạn không có phòng phù hợp
-            }
-
-            double hotelSimilarity = (Double) hotelResult[2];
-            logger.debug("Processing Hotel ID: {}, Similarity: {}", hotelId, hotelSimilarity);
-
-            Optional<Hotel> hotelOpt = hotels.stream().filter(h -> h.getId().equals(hotelId)).findFirst();
-            if (hotelOpt.isEmpty()) {
-                logger.warn("Hotel not found for ID: {}", hotelId);
-                continue;
-            }
-            Hotel hotel = hotelOpt.get();
-
-            // Lấy các phòng phù hợp với khách sạn này
-            List<RoomType> hotelRooms = relevantRoomTypes.stream()
-                    .filter(rt -> rt.getHotel().getId().equals(hotelId))
-                    .toList();
-
-            if (hotelRooms.isEmpty()) {
-                logger.debug("No matching rooms for Hotel ID: {}", hotelId);
-                continue; // Bỏ qua khách sạn không có phòng phù hợp
-            }
-
-            HotelSearchResponse response = new HotelSearchResponse();
-            response.setHotel(toHotelDTO(hotel));
-            response.setSimilarityScore(hotelSimilarity);
-
-            // Thêm thông tin phòng và similarity score của từng phòng
-            List<RoomDTO> rooms = new ArrayList<>();
-            for (RoomType room : hotelRooms) {
-                RoomDTO roomDTO = toRoomDTO(room);
-                // Tìm similarity score của phòng
-                Optional<Object[]> roomResultOpt = similarRooms.stream()
-                        .filter(r -> ((Integer) r[0]).equals(room.getId()))
-                        .findFirst();
-                if (roomResultOpt.isPresent()) {
-                    double roomSimilarity = (Double) roomResultOpt.get()[2];
-                    roomDTO.setSimilarityScore(roomSimilarity); // Giả sử RoomDTO có trường similarityScore
-                }
-                rooms.add(roomDTO);
-            }
-            response.setRooms(rooms);
-//        response.setPlaces(List.of()); // Tạm thời để trống, có thể cập nhật sau
-
-            responses.add(response);
-        }
-
         return responses;
     }
+
+    List<Integer> hotelIds = similarHotels.stream()
+            .map(result -> (Integer) result[0])
+            .toList();
+
+    // Lấy thông tin khách sạn
+    List<Hotel> hotels = hotelRepository.findAllById(hotelIds);
+
+    // Lấy tất cả các phòng liên quan đến các khách sạn được tìm thấy (không lọc theo ngưỡng similarity của phòng)
+    List<Integer> allRoomHotelIds = hotelIds; // Dùng hotelIds để lấy tất cả phòng của các khách sạn này
+    List<RoomType> allRelevantRoomTypes = roomRepository.findByHotelIds(allRoomHotelIds);
+
+    // Bước 2: Xây dựng kết quả
+    for (Object[] hotelResult : similarHotels) {
+        Integer hotelId = (Integer) hotelResult[0];
+        double hotelSimilarity = (Double) hotelResult[2];
+        logger.debug("Processing Hotel ID: {}, Similarity: {}", hotelId, hotelSimilarity);
+
+        Optional<Hotel> hotelOpt = hotels.stream().filter(h -> h.getId().equals(hotelId)).findFirst();
+        if (hotelOpt.isEmpty()) {
+            logger.warn("Hotel not found for ID: {}", hotelId);
+            continue;
+        }
+        Hotel hotel = hotelOpt.get();
+
+        // Lấy tất cả các phòng của khách sạn này (không cần lọc theo similarity)
+        List<RoomType> hotelRooms = allRelevantRoomTypes.stream()
+                .filter(rt -> rt.getHotel().getId().equals(hotelId))
+                .toList();
+
+        if (hotelRooms.isEmpty()) {
+            logger.debug("No rooms found for Hotel ID: {}", hotelId);
+            continue; // Bỏ qua nếu không có phòng, nhưng vẫn có thể giữ tùy ý
+        }
+
+        HotelSearchResponse response = new HotelSearchResponse();
+        response.setHotel(toHotelDTO(hotel));
+        response.setSimilarityScore(hotelSimilarity);
+
+        // Thêm thông tin phòng (không có similarity score cho phòng vì bỏ ngưỡng)
+        List<RoomDTO> rooms = new ArrayList<>();
+        for (RoomType room : hotelRooms) {
+            RoomDTO roomDTO = toRoomDTO(room);
+            rooms.add(roomDTO); // Không set similarityScore cho phòng
+        }
+        response.setRooms(rooms);
+//        response.setPlaces(List.of()); // Tạm thời để trống, có thể cập nhật sau
+
+        responses.add(response);
+    }
+
+    return responses;
+}
 
     @Transactional
     public List<HotelSearchResponse> searchHotelsV2(@Valid HotelSearchRequest request) {
